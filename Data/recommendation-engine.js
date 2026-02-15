@@ -250,6 +250,17 @@ var SmartOverlayEngine = (function () {
     }
 
     /**
+     * Extracts the keyboard shortcut from dashboard action header HTML.
+     * e.g. "<b>Deploy Peewee</b> <span...>[Q]</span>" -> "Q"
+     */
+    function extractShortcutFromHeader(header) {
+        if (!header) return '';
+        var match = header.match(/\[([A-Z0-9])\]/i);
+        if (match) return match[1].toUpperCase();
+        return '';
+    }
+
+    /**
      * Builds a lookup map from icon filename (lowercase) to unit object.
      */
     function buildIconLookup() {
@@ -286,6 +297,8 @@ var SmartOverlayEngine = (function () {
             var iconKey = extractIconName(action.image);
             var dbUnit = iconKey ? iconLookup[iconKey] : null;
 
+            var shortcut = extractShortcutFromHeader(action.header);
+
             if (dbUnit) {
                 // Score against wave using existing logic
                 var offMult = getDamageMultiplier(dbUnit.attackType, wave.defType);
@@ -321,6 +334,7 @@ var SmartOverlayEngine = (function () {
                     cost: action.goldCost || cost,
                     grayedOut: !!action.grayedOut,
                     actionIndex: action.index,
+                    shortcut: shortcut,
                     canAfford: gold > 0 ? (action.goldCost || cost) <= gold : true
                 });
             } else {
@@ -342,6 +356,7 @@ var SmartOverlayEngine = (function () {
                     cost: action.goldCost || 0,
                     grayedOut: !!action.grayedOut,
                     actionIndex: action.index,
+                    shortcut: shortcut,
                     canAfford: gold > 0 ? (action.goldCost || 0) <= gold : true
                 });
             }
@@ -356,10 +371,201 @@ var SmartOverlayEngine = (function () {
         };
     }
 
+    /**
+     * Analyzes the opponent's fighter grid from scoreboard data.
+     * Returns both attack and defense type breakdowns.
+     *
+     * @param {Array} grid - Array of tower objects from player.grid (each has .image, .unitType)
+     * @returns {Object} { defenseBreakdown, attackBreakdown, totalFighters }
+     */
+    function analyzeOpponentGrid(grid) {
+        if (!grid || grid.length === 0) {
+            return {
+                defenseBreakdown: {}, attackBreakdown: {},
+                defenseValue: {}, attackValue: {},
+                totalFighters: 0, totalValue: 0
+            };
+        }
+
+        var iconLookup = buildIconLookup();
+        var defBreakdown = {};  // count per armor type
+        var atkBreakdown = {};  // count per attack type
+        var defValue = {};      // gold value per armor type
+        var atkValue = {};      // gold value per attack type
+        var total = 0;
+        var totalVal = 0;
+
+        for (var i = 0; i < grid.length; i++) {
+            var tower = grid[i];
+            if (!tower.image) continue;
+
+            var iconKey = extractIconName(tower.image);
+            var dbUnit = iconKey ? iconLookup[iconKey] : null;
+
+            if (dbUnit) {
+                var armor = dbUnit.armorType || 'Unknown';
+                var attack = dbUnit.attackType || 'Unknown';
+                var goldVal = parseInt(dbUnit.goldCost, 10) || 50;
+
+                defBreakdown[armor] = (defBreakdown[armor] || 0) + 1;
+                atkBreakdown[attack] = (atkBreakdown[attack] || 0) + 1;
+                defValue[armor] = (defValue[armor] || 0) + goldVal;
+                atkValue[attack] = (atkValue[attack] || 0) + goldVal;
+                total++;
+                totalVal += goldVal;
+            } else {
+                defBreakdown['Unknown'] = (defBreakdown['Unknown'] || 0) + 1;
+                atkBreakdown['Unknown'] = (atkBreakdown['Unknown'] || 0) + 1;
+                total++;
+            }
+        }
+
+        return {
+            defenseBreakdown: defBreakdown, attackBreakdown: atkBreakdown,
+            defenseValue: defValue, attackValue: atkValue,
+            totalFighters: total, totalValue: totalVal
+        };
+    }
+
+    /**
+     * Scores mercenaries against the opponent's fighter composition.
+     * Filters to show only affordable mercs + a few near-affordable ones (dimmed).
+     *
+     * @param {Array}  actions - Windshield actions (mercenary bar).
+     * @param {Array}  defenderGrid - Cached grid array from defender's scoreboard data.
+     * @param {number} mythium - Player's current mythium.
+     * @returns {Object} { defenseBreakdown, totalFighters, recommendations[] }
+     */
+    function scoreMercenaries(actions, defenderGrid, mythium) {
+        var result = {
+            defenseBreakdown: {},
+            attackBreakdown: {},
+            defenseValue: {},
+            attackValue: {},
+            totalFighters: 0,
+            totalValue: 0,
+            recommendations: [],
+            totalScored: 0
+        };
+
+        if (!actions || actions.length === 0) return result;
+
+        var analysis = analyzeOpponentGrid(defenderGrid);
+        result.defenseBreakdown = analysis.defenseBreakdown;
+        result.attackBreakdown = analysis.attackBreakdown;
+        result.defenseValue = analysis.defenseValue;
+        result.attackValue = analysis.attackValue;
+        result.totalFighters = analysis.totalFighters;
+        result.totalValue = analysis.totalValue;
+
+        var iconLookup = buildIconLookup();
+        var scored = [];
+        var currentMythium = mythium || 0;
+
+        for (var i = 0; i < actions.length; i++) {
+            var action = actions[i];
+            var iconKey = extractIconName(action.image);
+            var dbUnit = iconKey ? iconLookup[iconKey] : null;
+            var shortcut = extractShortcutFromHeader(action.header);
+            var cost = action.goldCost || 0;
+            var canAfford = currentMythium > 0 ? cost <= currentMythium : !action.grayedOut;
+            // "Near affordable" = within 30 mythium of being able to buy
+            var nearAffordable = !canAfford && currentMythium > 0 && cost <= currentMythium + 30;
+
+            if (dbUnit && analysis.totalFighters > 0) {
+                // Offensive score: merc attack vs opponent defense types
+                // Weighted by gold value so evolved units matter more
+                var offTotal = 0;
+                var offWeight = 0;
+                for (var defType in analysis.defenseValue) {
+                    if (defType === 'Unknown') continue;
+                    var defGold = analysis.defenseValue[defType];
+                    var offMult = getDamageMultiplier(dbUnit.attackType, defType);
+                    offTotal += offMult * defGold;
+                    offWeight += defGold;
+                }
+                var avgOffMult = offWeight > 0 ? offTotal / offWeight : 1.0;
+
+                // Defensive score: opponent attack types vs merc armor
+                // Weighted by gold value
+                var defTotal = 0;
+                var defWeight = 0;
+                for (var atkType in analysis.attackValue) {
+                    if (atkType === 'Unknown') continue;
+                    var atkGold = analysis.attackValue[atkType];
+                    var defMult = getDamageMultiplier(atkType, dbUnit.armorType);
+                    defTotal += defMult * atkGold;
+                    defWeight += atkGold;
+                }
+                var avgDefMult = defWeight > 0 ? defTotal / defWeight : 1.0;
+                // Invert: lower damage taken = better survival
+                var survivalMult = 2.0 - avgDefMult;
+
+                // Combine: 60% offense (how much damage merc deals), 40% survival
+                var offScore = ((avgOffMult - 0.75) / 0.50) * 100;
+                offScore = clamp(offScore, 0, 100);
+                var defScore = ((survivalMult - 0.75) / 0.50) * 100;
+                defScore = clamp(defScore, 0, 100);
+
+                var totalScore = offScore * 0.6 + defScore * 0.4;
+
+                scored.push({
+                    unit: dbUnit,
+                    totalScore: Math.round(totalScore * 10) / 10,
+                    avgOffMult: avgOffMult,
+                    avgDefMult: avgDefMult,
+                    cost: cost,
+                    grayedOut: !!action.grayedOut,
+                    canAfford: canAfford,
+                    nearAffordable: nearAffordable,
+                    actionId: action.actionId != null ? action.actionId : '',
+                    actionIndex: action.index,
+                    shortcut: shortcut
+                });
+            } else {
+                // No opponent data or unmatched merc
+                var unitName = extractUnitNameFromHeader(action.header) || iconKey || 'Unknown';
+                scored.push({
+                    unit: dbUnit || {
+                        name: unitName,
+                        iconPath: action.image || '',
+                        attackType: '?',
+                        armorType: '?'
+                    },
+                    totalScore: 0,
+                    avgOffMult: 1.0,
+                    avgDefMult: 1.0,
+                    cost: cost,
+                    grayedOut: !!action.grayedOut,
+                    canAfford: canAfford,
+                    nearAffordable: nearAffordable,
+                    actionId: action.actionId != null ? action.actionId : '',
+                    actionIndex: action.index,
+                    shortcut: shortcut
+                });
+            }
+        }
+
+        scored.sort(function (a, b) { return b.totalScore - a.totalScore; });
+
+        // Filter: show affordable mercs + near-affordable (dimmed), hide the rest
+        var filtered = [];
+        for (var j = 0; j < scored.length; j++) {
+            if (scored[j].canAfford || scored[j].nearAffordable) {
+                filtered.push(scored[j]);
+            }
+        }
+
+        result.recommendations = filtered;
+        result.totalScored = filtered.length;
+        return result;
+    }
+
     // Public API
     return {
         getRecommendations: getRecommendations,
         scoreFromDashboardActions: scoreFromDashboardActions,
+        scoreMercenaries: scoreMercenaries,
         getDamageMultiplier: getDamageMultiplier,
         multiplierToPercent: multiplierToPercent,
         multiplierClass: multiplierClass,

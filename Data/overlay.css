@@ -1,9 +1,11 @@
 /* LTD2 Smart Overlay - Styles */
 
-#smart-overlay-root {
+/* ============================================================
+   Shared panel base
+   ============================================================ */
+.so-panel,
+.mo-panel {
     position: fixed;
-    top: 10px;
-    right: 10px;
     width: 340px;
     max-height: 500px;
     background: rgba(15, 22, 36, 0.92);
@@ -19,12 +21,32 @@
     transition: opacity 0.2s ease;
 }
 
-#smart-overlay-root.so-hidden {
+/* Fighter panel default position */
+.so-panel {
+    top: 10px;
+    right: 10px;
+}
+
+/* Merc panel default position (below fighter) */
+.mo-panel {
+    top: 10px;
+    right: 360px;
+    border-color: rgba(180, 120, 80, 0.7);
+}
+
+.so-hidden {
     opacity: 0;
     pointer-events: none;
 }
 
-/* Header - draggable */
+.so-dragging {
+    opacity: 0.85;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+/* ============================================================
+   Fighter header
+   ============================================================ */
 .so-header {
     display: flex;
     align-items: center;
@@ -33,11 +55,6 @@
     background: rgba(30, 50, 70, 0.8);
     border-bottom: 1px solid rgba(85, 134, 138, 0.4);
     cursor: move;
-}
-
-#smart-overlay-root.so-dragging {
-    opacity: 0.85;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
 }
 
 .so-header-title {
@@ -66,7 +83,105 @@
     border-color: rgba(85, 134, 138, 0.8);
 }
 
-/* Wave info bar */
+/* ============================================================
+   Merc header (orange accent)
+   ============================================================ */
+.mo-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(50, 35, 20, 0.8);
+    border-bottom: none;
+    cursor: move;
+    gap: 8px;
+}
+
+.mo-header-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #aa8866;
+    flex-shrink: 0;
+}
+
+.mo-header-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e8c8a0;
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Info bar below header: value + assessment + mythium */
+.mo-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px 6px;
+    background: rgba(50, 35, 20, 0.8);
+    border-bottom: 1px solid rgba(180, 120, 80, 0.4);
+    font-size: 12px;
+    cursor: move;
+}
+
+.mo-info-value {
+    color: #f0d060;
+    font-weight: 600;
+}
+
+.mo-info-myth {
+    color: #aa8866;
+}
+
+.mo-info-sep {
+    color: rgba(180, 120, 80, 0.5);
+}
+
+.mo-val-badge {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    vertical-align: middle;
+    letter-spacing: 0.3px;
+}
+
+.mo-val-ok {
+    background: rgba(60, 160, 60, 0.3);
+    color: #80d080;
+}
+
+.mo-val-low {
+    background: rgba(200, 80, 80, 0.3);
+    color: #f09090;
+}
+
+.mo-val-high {
+    background: rgba(80, 120, 200, 0.3);
+    color: #a0c0f0;
+}
+
+.mo-toggle-btn {
+    background: none;
+    border: 1px solid rgba(180, 120, 80, 0.5);
+    border-radius: 3px;
+    color: #aa8866;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.mo-toggle-btn:hover {
+    color: #e8c8a0;
+    border-color: rgba(180, 120, 80, 0.8);
+}
+
+/* ============================================================
+   Wave info bar (fighter panel)
+   ============================================================ */
 .so-wave-info {
     display: flex;
     flex-direction: column;
@@ -111,24 +226,192 @@
     border: 1px solid rgba(80, 120, 200, 0.3);
 }
 
-/* Recommendations list */
-.so-recommendations {
+/* ============================================================
+   Defense breakdown bar (merc panel)
+   ============================================================ */
+.mo-defense-bar {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    background: rgba(40, 30, 20, 0.6);
+    border-bottom: 1px solid rgba(180, 120, 80, 0.2);
+    gap: 3px;
+}
+
+.mo-defense-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #aa8866;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 1px;
+}
+
+.mo-atk-label {
+    margin-top: 6px;
+}
+
+.mo-defense-hint {
+    font-size: 11px;
+    color: #aa8866;
+    font-style: italic;
+    text-align: center;
+    padding: 6px 0;
+}
+
+.mo-def-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 20px;
+}
+
+.mo-def-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(120, 120, 120, 0.2);
+    color: #bbccdd;
+    border: 1px solid rgba(120, 120, 120, 0.3);
+    width: 72px;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.mo-def-bar-track {
+    flex: 1;
+    height: 5px;
+    background: rgba(60, 60, 60, 0.4);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.mo-def-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.mo-def-count {
+    font-size: 10px;
+    color: #f0d060;
+    min-width: 32px;
+    text-align: right;
+    flex-shrink: 0;
+    font-weight: 600;
+}
+
+.mo-def-chip.mo-def-fortified {
+    background: rgba(80, 120, 200, 0.2);
+    color: #a0c0f0;
+    border-color: rgba(80, 120, 200, 0.3);
+}
+.mo-def-bar-fill.mo-def-fortified {
+    background: rgba(80, 120, 200, 0.6);
+}
+
+.mo-def-chip.mo-def-natural {
+    background: rgba(60, 160, 60, 0.2);
+    color: #80d080;
+    border-color: rgba(60, 160, 60, 0.3);
+}
+.mo-def-bar-fill.mo-def-natural {
+    background: rgba(60, 160, 60, 0.6);
+}
+
+.mo-def-chip.mo-def-swift {
+    background: rgba(220, 180, 40, 0.2);
+    color: #e0d060;
+    border-color: rgba(220, 180, 40, 0.3);
+}
+.mo-def-bar-fill.mo-def-swift {
+    background: rgba(220, 180, 40, 0.6);
+}
+
+.mo-def-chip.mo-def-arcane {
+    background: rgba(160, 80, 220, 0.2);
+    color: #c090f0;
+    border-color: rgba(160, 80, 220, 0.3);
+}
+.mo-def-bar-fill.mo-def-arcane {
+    background: rgba(160, 80, 220, 0.6);
+}
+
+.mo-def-chip.mo-def-immaterial {
+    background: rgba(180, 180, 180, 0.15);
+    color: #bbbbcc;
+    border-color: rgba(180, 180, 180, 0.2);
+}
+.mo-def-bar-fill.mo-def-immaterial {
+    background: rgba(180, 180, 180, 0.4);
+}
+
+/* Attack type colors (Pierce, Impact, Magic, Pure) */
+.mo-def-chip.mo-def-pierce {
+    background: rgba(200, 80, 80, 0.2);
+    color: #f0a0a0;
+    border-color: rgba(200, 80, 80, 0.3);
+}
+.mo-def-bar-fill.mo-def-pierce {
+    background: rgba(200, 80, 80, 0.6);
+}
+
+.mo-def-chip.mo-def-impact {
+    background: rgba(220, 160, 40, 0.2);
+    color: #e0c060;
+    border-color: rgba(220, 160, 40, 0.3);
+}
+.mo-def-bar-fill.mo-def-impact {
+    background: rgba(220, 160, 40, 0.6);
+}
+
+.mo-def-chip.mo-def-magic {
+    background: rgba(120, 80, 220, 0.2);
+    color: #b090f0;
+    border-color: rgba(120, 80, 220, 0.3);
+}
+.mo-def-bar-fill.mo-def-magic {
+    background: rgba(120, 80, 220, 0.6);
+}
+
+.mo-def-chip.mo-def-pure {
+    background: rgba(200, 200, 200, 0.15);
+    color: #ccccdd;
+    border-color: rgba(200, 200, 200, 0.2);
+}
+.mo-def-bar-fill.mo-def-pure {
+    background: rgba(200, 200, 200, 0.4);
+}
+
+/* ============================================================
+   Recommendations list (shared scrollbar, used by both panels)
+   ============================================================ */
+.so-recommendations,
+.mo-recommendations {
     padding: 4px 0;
     max-height: 360px;
     overflow-y: auto;
 }
 
-.so-recommendations::-webkit-scrollbar {
+.so-recommendations::-webkit-scrollbar,
+.mo-recommendations::-webkit-scrollbar {
     width: 4px;
 }
 
-.so-recommendations::-webkit-scrollbar-thumb {
+.so-recommendations::-webkit-scrollbar-thumb,
+.mo-recommendations::-webkit-scrollbar-thumb {
     background: rgba(85, 134, 138, 0.4);
     border-radius: 2px;
 }
 
-/* Unit card */
-.so-unit-card {
+/* ============================================================
+   Unit card (shared between fighter + merc)
+   ============================================================ */
+.so-unit-card,
+.mo-unit-card {
     display: flex;
     align-items: center;
     padding: 6px 12px;
@@ -137,33 +420,50 @@
     transition: background 0.15s ease;
 }
 
-.so-unit-card:hover {
+.so-unit-card:hover,
+.mo-unit-card:hover {
     background: rgba(85, 134, 138, 0.1);
 }
 
-.so-unit-card:last-child {
+.mo-unit-card[data-action-id] {
+    cursor: pointer;
+}
+
+.mo-unit-card[data-action-id]:active {
+    background: rgba(180, 120, 80, 0.2);
+}
+
+.so-unit-card:last-child,
+.mo-unit-card:last-child {
     border-bottom: none;
 }
 
-.so-unit-rank {
-    font-size: 16px;
+.so-unit-key {
+    font-size: 13px;
     font-weight: 700;
-    color: rgba(168, 216, 234, 0.4);
-    width: 18px;
+    color: #a8d8ea;
+    width: 20px;
     text-align: center;
     flex-shrink: 0;
+    background: rgba(85, 134, 138, 0.25);
+    border: 1px solid rgba(85, 134, 138, 0.4);
+    border-radius: 3px;
+    padding: 2px 0;
+    line-height: 1;
 }
 
-.so-unit-card:first-child .so-unit-rank {
+/* Gold highlight for top-ranked unit in fighter panel */
+.so-unit-card:first-child .so-unit-key {
     color: #f0c060;
+    border-color: rgba(240, 192, 96, 0.4);
+    background: rgba(240, 192, 96, 0.15);
 }
 
-.so-unit-card:nth-child(2) .so-unit-rank {
-    color: #b0c0d0;
-}
-
-.so-unit-card:nth-child(3) .so-unit-rank {
-    color: #c09060;
+/* Orange highlight for top-ranked merc */
+.mo-unit-card:first-child .so-unit-key {
+    color: #e8c8a0;
+    border-color: rgba(180, 120, 80, 0.4);
+    background: rgba(180, 120, 80, 0.15);
 }
 
 .so-unit-icon {
@@ -217,6 +517,9 @@
     min-width: 36px;
 }
 
+/* ============================================================
+   Matchup color classes
+   ============================================================ */
 .so-match-strong {
     background: rgba(40, 180, 80, 0.25);
     color: #60e090;
@@ -256,7 +559,9 @@
     border: 1px solid rgba(160, 120, 220, 0.3);
 }
 
-/* Score bar */
+/* ============================================================
+   Score
+   ============================================================ */
 .so-score {
     font-size: 12px;
     font-weight: 700;
@@ -266,7 +571,9 @@
     flex-shrink: 0;
 }
 
-/* Footer */
+/* ============================================================
+   Footer
+   ============================================================ */
 .so-footer {
     padding: 4px 12px;
     font-size: 10px;
@@ -275,7 +582,9 @@
     border-top: 1px solid rgba(85, 134, 138, 0.15);
 }
 
-/* Empty / Error states */
+/* ============================================================
+   States
+   ============================================================ */
 .so-empty {
     padding: 20px 12px;
     text-align: center;
@@ -283,20 +592,6 @@
     font-style: italic;
 }
 
-/* Unaffordable / grayed units */
-.so-unit-card.so-unaffordable {
-    opacity: 0.5;
-}
-
-.so-unit-card.so-grayed {
-    opacity: 0.4;
-}
-
-.so-unit-card.so-unaffordable .so-unit-cost {
-    color: #f08080;
-}
-
-/* Waiting state */
 .so-waiting {
     padding: 20px 12px;
     text-align: center;
@@ -304,10 +599,31 @@
     font-style: italic;
 }
 
-/* Minimized state */
-#smart-overlay-root.so-minimized .so-wave-info,
-#smart-overlay-root.so-minimized .so-recommendations,
-#smart-overlay-root.so-minimized .so-footer,
-#smart-overlay-root.so-minimized .so-waiting {
+/* Unaffordable / grayed */
+.so-unit-card.so-unaffordable,
+.mo-unit-card.so-unaffordable {
+    opacity: 0.5;
+}
+
+.so-unit-card.so-grayed,
+.mo-unit-card.so-grayed {
+    opacity: 0.4;
+}
+
+.so-unit-card.so-unaffordable .so-unit-cost {
+    color: #f08080;
+}
+
+/* ============================================================
+   Minimized state (hides body content, keeps header)
+   ============================================================ */
+.so-minimized .so-wave-info,
+.so-minimized .so-recommendations,
+.so-minimized .mo-info-bar,
+.so-minimized .mo-defense-bar,
+.so-minimized .mo-recommendations,
+.so-minimized .so-footer,
+.so-minimized .so-waiting,
+.so-minimized .so-empty {
     display: none;
 }
