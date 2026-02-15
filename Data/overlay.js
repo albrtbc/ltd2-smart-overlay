@@ -117,20 +117,51 @@
     }
 
     /**
+     * Walk up the DOM tree to find an ancestor (or self) with the given class.
+     * Polyfill for Element.closest() which may not exist in Coherent UI.
+     */
+    function findAncestorWithClass(el, className) {
+        while (el && el !== document) {
+            if (el.className && (' ' + el.className + ' ').indexOf(' ' + className + ' ') !== -1) {
+                return el;
+            }
+            el = el.parentNode;
+        }
+        return null;
+    }
+
+    function hasClass(el, cls) {
+        if (!el || !el.className) return false;
+        return (' ' + el.className + ' ').indexOf(' ' + cls + ' ') !== -1;
+    }
+
+    function addClass(el, cls) {
+        if (!hasClass(el, cls)) {
+            el.className = (el.className ? el.className + ' ' : '') + cls;
+        }
+    }
+
+    function removeClass(el, cls) {
+        if (!el || !el.className) return;
+        el.className = (' ' + el.className + ' ').replace(' ' + cls + ' ', ' ').replace(/^\s+|\s+$/g, '');
+    }
+
+    /**
      * Make the overlay draggable by its header.
      */
     function bindDrag(root) {
         document.addEventListener('mousedown', function (e) {
-            var header = e.target.closest('.so-header');
+            // Check if click is inside the header
+            var header = findAncestorWithClass(e.target, 'so-header');
             if (!header) return;
             // Don't drag if clicking the minimize button
-            if (e.target.closest('.so-toggle-btn')) return;
+            if (findAncestorWithClass(e.target, 'so-toggle-btn')) return;
 
             dragging = true;
             var rect = root.getBoundingClientRect();
             dragOffsetX = e.clientX - rect.left;
             dragOffsetY = e.clientY - rect.top;
-            root.classList.add('so-dragging');
+            addClass(root, 'so-dragging');
             e.preventDefault();
         });
 
@@ -150,7 +181,7 @@
         document.addEventListener('mouseup', function () {
             if (!dragging) return;
             dragging = false;
-            root.classList.remove('so-dragging');
+            removeClass(root, 'so-dragging');
             savePosition(root);
         });
     }
@@ -180,9 +211,14 @@
      * Main render function - rebuilds the overlay DOM.
      */
     function render() {
+        // Skip DOM rebuild while dragging to avoid interference
+        if (dragging) return;
+
         var root = document.getElementById(OVERLAY_ID);
         if (!root) return;
 
+        // Preserve so-dragging if mid-drag
+        var wasDragging = dragging;
         root.className = '';
         if (!state.visible) {
             root.className = 'so-hidden';
@@ -191,6 +227,9 @@
         }
         if (state.minimized) {
             root.className = 'so-minimized';
+        }
+        if (wasDragging) {
+            addClass(root, 'so-dragging');
         }
 
         var eng = window.SmartOverlayEngine;
