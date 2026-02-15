@@ -1,0 +1,76 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <Description>Smart overlay for Legion TD 2 - shows optimal unit recommendations per wave</Description>
+    <Version>0.1.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <PackageId>ltd2.mods.smartoverlay</PackageId>
+    <Title>LTD2SmartOverlay</Title>
+    <Authors>SmartOverlay</Authors>
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <LTD2GamePath>C:\Program Files\Epic Games\LegionTD2</LTD2GamePath>
+  </PropertyGroup>
+
+  <!-- BepInEx + Harmony from local installation -->
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(LTD2GamePath)\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(LTD2GamePath)\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Game DLL references -->
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(LTD2GamePath)\Legion TD 2_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>$(LTD2GamePath)\Legion TD 2_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="GameData">
+      <HintPath>$(LTD2GamePath)\Legion TD 2_Data\Managed\GameData.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Natives">
+      <HintPath>$(LTD2GamePath)\Legion TD 2_Data\Managed\Natives.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(LTD2GamePath)\Legion TD 2_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(LTD2GamePath)\Legion TD 2_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(LTD2GamePath)\Legion TD 2_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(LTD2GamePath)\Legion TD 2_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Embedded JS/CSS resources -->
+  <ItemGroup>
+    <None Remove="Data\overlay.js" />
+    <EmbeddedResource Include="Data\overlay.js" />
+    <None Remove="Data\overlay.css" />
+    <EmbeddedResource Include="Data\overlay.css" />
+    <None Remove="Data\units-database.js" />
+    <EmbeddedResource Include="Data\units-database.js" />
+    <None Remove="Data\waves-database.js" />
+    <EmbeddedResource Include="Data\waves-database.js" />
+    <None Remove="Data\recommendation-engine.js" />
+    <EmbeddedResource Include="Data\recommendation-engine.js" />
+  </ItemGroup>
+</Project>

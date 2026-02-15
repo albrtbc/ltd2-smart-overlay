@@ -1,0 +1,313 @@
+/* LTD2 Smart Overlay - Styles */
+
+#smart-overlay-root {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 340px;
+    max-height: 500px;
+    background: rgba(15, 22, 36, 0.92);
+    border: 1px solid rgba(85, 134, 138, 0.7);
+    border-radius: 6px;
+    color: #e0e8ef;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    z-index: 9999;
+    overflow: hidden;
+    user-select: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    transition: opacity 0.2s ease;
+}
+
+#smart-overlay-root.so-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Header - draggable */
+.so-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(30, 50, 70, 0.8);
+    border-bottom: 1px solid rgba(85, 134, 138, 0.4);
+    cursor: move;
+}
+
+#smart-overlay-root.so-dragging {
+    opacity: 0.85;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+.so-header-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #a8d8ea;
+}
+
+.so-header-wave {
+    font-size: 12px;
+    color: #8899aa;
+}
+
+.so-toggle-btn {
+    background: none;
+    border: 1px solid rgba(85, 134, 138, 0.5);
+    border-radius: 3px;
+    color: #8899aa;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 11px;
+}
+
+.so-toggle-btn:hover {
+    color: #a8d8ea;
+    border-color: rgba(85, 134, 138, 0.8);
+}
+
+/* Wave info bar */
+.so-wave-info {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 12px;
+    background: rgba(25, 40, 58, 0.6);
+    border-bottom: 1px solid rgba(85, 134, 138, 0.2);
+    gap: 4px;
+}
+
+.so-wave-creature {
+    font-weight: 600;
+    color: #d4e4f0;
+    flex: 1;
+    text-align: center;
+}
+
+.so-wave-types {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.so-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.so-type-badge.so-atk {
+    background: rgba(200, 80, 80, 0.25);
+    color: #f0a0a0;
+    border: 1px solid rgba(200, 80, 80, 0.3);
+}
+
+.so-type-badge.so-def {
+    background: rgba(80, 120, 200, 0.25);
+    color: #a0c0f0;
+    border: 1px solid rgba(80, 120, 200, 0.3);
+}
+
+/* Recommendations list */
+.so-recommendations {
+    padding: 4px 0;
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.so-recommendations::-webkit-scrollbar {
+    width: 4px;
+}
+
+.so-recommendations::-webkit-scrollbar-thumb {
+    background: rgba(85, 134, 138, 0.4);
+    border-radius: 2px;
+}
+
+/* Unit card */
+.so-unit-card {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    gap: 8px;
+    border-bottom: 1px solid rgba(85, 134, 138, 0.1);
+    transition: background 0.15s ease;
+}
+
+.so-unit-card:hover {
+    background: rgba(85, 134, 138, 0.1);
+}
+
+.so-unit-card:last-child {
+    border-bottom: none;
+}
+
+.so-unit-rank {
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(168, 216, 234, 0.4);
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.so-unit-card:first-child .so-unit-rank {
+    color: #f0c060;
+}
+
+.so-unit-card:nth-child(2) .so-unit-rank {
+    color: #b0c0d0;
+}
+
+.so-unit-card:nth-child(3) .so-unit-rank {
+    color: #c09060;
+}
+
+.so-unit-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    border: 1px solid rgba(85, 134, 138, 0.3);
+    background: rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
+}
+
+.so-unit-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.so-unit-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #d4e4f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.so-unit-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    color: #8899aa;
+    margin-top: 2px;
+}
+
+.so-unit-cost {
+    color: #f0d060;
+}
+
+.so-unit-matchups {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.so-matchup {
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    min-width: 36px;
+}
+
+.so-match-strong {
+    background: rgba(40, 180, 80, 0.25);
+    color: #60e090;
+    border: 1px solid rgba(40, 180, 80, 0.3);
+}
+
+.so-match-good {
+    background: rgba(80, 160, 80, 0.2);
+    color: #90d090;
+    border: 1px solid rgba(80, 160, 80, 0.25);
+}
+
+.so-match-neutral {
+    background: rgba(120, 120, 120, 0.15);
+    color: #99aabb;
+    border: 1px solid rgba(120, 120, 120, 0.2);
+}
+
+.so-match-poor {
+    background: rgba(180, 100, 40, 0.2);
+    color: #e0a060;
+    border: 1px solid rgba(180, 100, 40, 0.25);
+}
+
+.so-match-weak {
+    background: rgba(200, 60, 60, 0.25);
+    color: #f08080;
+    border: 1px solid rgba(200, 60, 60, 0.3);
+}
+
+.so-upgrade-badge {
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: rgba(160, 120, 220, 0.25);
+    color: #c0a0f0;
+    border: 1px solid rgba(160, 120, 220, 0.3);
+}
+
+/* Score bar */
+.so-score {
+    font-size: 12px;
+    font-weight: 700;
+    color: #a8d8ea;
+    width: 32px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* Footer */
+.so-footer {
+    padding: 4px 12px;
+    font-size: 10px;
+    color: #556677;
+    text-align: center;
+    border-top: 1px solid rgba(85, 134, 138, 0.15);
+}
+
+/* Empty / Error states */
+.so-empty {
+    padding: 20px 12px;
+    text-align: center;
+    color: #667788;
+    font-style: italic;
+}
+
+/* Unaffordable / grayed units */
+.so-unit-card.so-unaffordable {
+    opacity: 0.5;
+}
+
+.so-unit-card.so-grayed {
+    opacity: 0.4;
+}
+
+.so-unit-card.so-unaffordable .so-unit-cost {
+    color: #f08080;
+}
+
+/* Waiting state */
+.so-waiting {
+    padding: 20px 12px;
+    text-align: center;
+    color: #667788;
+    font-style: italic;
+}
+
+/* Minimized state */
+#smart-overlay-root.so-minimized .so-wave-info,
+#smart-overlay-root.so-minimized .so-recommendations,
+#smart-overlay-root.so-minimized .so-footer,
+#smart-overlay-root.so-minimized .so-waiting {
+    display: none;
+}
