@@ -13,9 +13,12 @@
 
     var FIGHTER_ID = 'smart-overlay-root';
     var MERC_ID = 'merc-overlay-root';
+    var SCOUT_ID = 'scout-overlay-root';
     var ICON_CDN = 'https://cdn.legiontd2.com/icons/';
     var STORAGE_KEY_FIGHTER = 'smartOverlayPosition';
     var STORAGE_KEY_MERC = 'mercOverlayPosition';
+    var STORAGE_KEY_SCOUT = 'scoutOverlayPosition';
+    var SCOUT_API = 'https://stats.drachbot.site/api/drachbot_overlay/';
     var RENDER_DEBOUNCE_MS = 100;
 
     // --- Shared state ---
@@ -24,6 +27,7 @@
         gold: 0,
         mythium: 0,
         inGame: false,
+        currentValue: 0,
         recommendedValue: 0,
         recThresholds: null, // { redMin, yellowMin, greenMin, greenMax, yellowMax, redMax }
         // Fighter panel
@@ -39,7 +43,15 @@
         defenderValue: 0,     // opponent's total fighter value
         defenderValueDelta: '',  // delta string from scoreboard (e.g. "(-5)")
         mercMinimized: false,
-        mercVisible: true
+        mercVisible: true,
+        // Own army (for defense strength forecast)
+        myGrid: null,
+        myValue: 0,
+        myAttackValue: {},
+        myDefenseValue: {},
+        // Scouting panel
+        scoutingPlayers: {},   // {key: {name, isAlly, data, loading, error}}
+        scoutingVisible: false
     };
 
     var renderTimer = null;
@@ -106,6 +118,7 @@
             renderTimer = null;
             renderFighter();
             renderMerc();
+            renderScouting();
         }, RENDER_DEBOUNCE_MS);
     }
 
@@ -153,6 +166,171 @@
         }
     }
 
+    /**
+     * Cache our own grid from scoreboard data (normal view, not enemy view).
+     */
+    function cacheMyGrid(players) {
+        if (!players || !players.length) return;
+
+        var myName = '';
+        if (typeof globalState !== 'undefined') {
+            myName = globalState.savedUsername || '';
+        }
+        if (!myName) return;
+
+        var eng = window.SmartOverlayEngine;
+        if (!eng || !eng.analyzeGrid) return;
+
+        for (var i = 0; i < players.length; i++) {
+            var p = players[i];
+            if (p.name !== myName) continue;
+
+            if (p.grid && p.grid.length > 0) {
+                state.myGrid = p.grid;
+                state.myValue = p.value || 0;
+                var analysis = eng.analyzeGrid(p.grid);
+                state.myDefenseValue = analysis.defenseValue;
+                state.myAttackValue = analysis.attackValue;
+                console.log('[SmartOverlay] Cached my grid: ' +
+                    p.grid.length + ' fighters, value=' + state.myValue);
+            }
+            return;
+        }
+    }
+
+    /**
+     * Track a purchase by matching the value delta to a dashboard unit.
+     * Accumulates the bought unit's types into myAttackValue/myDefenseValue.
+     */
+    function trackPurchaseByDelta(delta) {
+        if (!state.dashboardActions) return;
+
+        var eng = window.SmartOverlayEngine;
+        if (!eng) return;
+
+        // Build icon+name lookup to find the unit data
+        var bestMatch = null;
+        var bestDiff = Infinity;
+
+        for (var i = 0; i < state.dashboardActions.length; i++) {
+            var action = state.dashboardActions[i];
+            var cost = action.goldCost || 0;
+            if (cost <= 0) continue;
+            var diff = Math.abs(cost - delta);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestMatch = action;
+            }
+        }
+
+        // Accept if within 20% tolerance (upgrades may have slight cost differences)
+        if (!bestMatch || bestDiff > delta * 0.2) return;
+
+        // Look up unit data from database
+        var result = eng.scoreFromDashboardActions([bestMatch], state.waveNum, 99999);
+        if (result.recommendations && result.recommendations.length > 0) {
+            var unit = result.recommendations[0].unit;
+            if (unit && unit.armorType && unit.attackType) {
+                var cost = bestMatch.goldCost || 0;
+                var armor = unit.armorType;
+                var attack = unit.attackType;
+                state.myDefenseValue[armor] = (state.myDefenseValue[armor] || 0) + cost;
+                state.myAttackValue[attack] = (state.myAttackValue[attack] || 0) + cost;
+                // Mark that we have tracking data (even without Tab)
+                if (!state.myGrid) state.myGrid = [1]; // truthy placeholder
+                console.log('[SmartOverlay] Tracked purchase: ' + unit.name +
+                    ' (' + attack + '/' + armor + ', ' + cost + 'g)');
+            }
+        }
+    }
+
+    // =========================================================================
+    //  Scouting — extract player names from scoreboard
+    // =========================================================================
+
+    function captureScoutingFromScoreboard(players) {
+        if (!players || !players.length) return;
+
+        // Collect already-known names
+        var seen = {};
+        var nextIdx = 0;
+        for (var key in state.scoutingPlayers) {
+            if (state.scoutingPlayers.hasOwnProperty(key)) {
+                seen[state.scoutingPlayers[key].name] = true;
+                var n = parseInt(key, 10);
+                if (n > nextIdx) nextIdx = n;
+            }
+        }
+
+        var added = 0;
+
+        // Players in the scoreboard array are allies (including me).
+        // Their defenderPlayerName fields are the opponents.
+        for (var i = 0; i < players.length; i++) {
+            var p = players[i];
+            if (p.name && !seen[p.name]) {
+                seen[p.name] = true;
+                nextIdx++;
+                state.scoutingPlayers[nextIdx] = {
+                    name: p.name, isAlly: true,
+                    data: null, loading: true, error: null
+                };
+                fetchScoutingData(p.name, nextIdx);
+                added++;
+            }
+            if (p.defenderPlayerName && !seen[p.defenderPlayerName]) {
+                seen[p.defenderPlayerName] = true;
+                nextIdx++;
+                state.scoutingPlayers[nextIdx] = {
+                    name: p.defenderPlayerName, isAlly: false,
+                    data: null, loading: true, error: null
+                };
+                fetchScoutingData(p.defenderPlayerName, nextIdx);
+                added++;
+            }
+        }
+
+        if (added > 0) {
+            state.scoutingVisible = true;
+            console.log('[SmartOverlay] Scouting: added ' + added + ' players (total: ' + nextIdx + ').');
+            scheduleRender();
+        }
+    }
+
+    // =========================================================================
+    //  Scouting API fetch
+    // =========================================================================
+
+    function fetchScoutingData(playerName, playerNum) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', SCOUT_API + encodeURIComponent(playerName), true);
+        xhr.timeout = 8000;
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    state.scoutingPlayers[playerNum].data = data;
+                    state.scoutingPlayers[playerNum].loading = false;
+                } catch (e) {
+                    state.scoutingPlayers[playerNum].error = true;
+                    state.scoutingPlayers[playerNum].loading = false;
+                }
+            } else {
+                state.scoutingPlayers[playerNum].error = true;
+                state.scoutingPlayers[playerNum].loading = false;
+            }
+            scheduleRender();
+        };
+        xhr.onerror = xhr.ontimeout = function () {
+            if (state.scoutingPlayers[playerNum]) {
+                state.scoutingPlayers[playerNum].error = true;
+                state.scoutingPlayers[playerNum].loading = false;
+            }
+            scheduleRender();
+        };
+        xhr.send();
+    }
+
     // =========================================================================
     //  Position persistence
     // =========================================================================
@@ -186,14 +364,17 @@
     function initDrag() {
         document.addEventListener('mousedown', function (e) {
             var header = findAncestorWithClass(e.target, 'so-header') ||
-                         findAncestorWithClass(e.target, 'mo-header');
+                         findAncestorWithClass(e.target, 'mo-header') ||
+                         findAncestorWithClass(e.target, 'sc-header');
             if (!header) return;
             if (findAncestorWithClass(e.target, 'so-toggle-btn') ||
-                findAncestorWithClass(e.target, 'mo-toggle-btn')) return;
+                findAncestorWithClass(e.target, 'mo-toggle-btn') ||
+                findAncestorWithClass(e.target, 'sc-toggle-btn')) return;
 
             // Determine which panel owns this header
             var panel = findAncestorWithClass(e.target, 'so-panel') ||
-                        findAncestorWithClass(e.target, 'mo-panel');
+                        findAncestorWithClass(e.target, 'mo-panel') ||
+                        findAncestorWithClass(e.target, 'sc-panel');
             if (!panel) return;
 
             dragTarget = panel;
@@ -218,7 +399,9 @@
             if (!dragTarget) return;
             removeClass(dragTarget, 'so-dragging');
             // Save position based on panel id
-            var key = dragTarget.id === MERC_ID ? STORAGE_KEY_MERC : STORAGE_KEY_FIGHTER;
+            var key = dragTarget.id === MERC_ID ? STORAGE_KEY_MERC
+                    : dragTarget.id === SCOUT_ID ? STORAGE_KEY_SCOUT
+                    : STORAGE_KEY_FIGHTER;
             savePosition(dragTarget, key);
             dragTarget = null;
         });
@@ -252,8 +435,23 @@
         });
 
         engine.on('refreshRecommendedValues', function (waveNumber, currentValue, recommendedValue, thresholds) {
+            var prevValue = state.currentValue;
+            state.currentValue = currentValue;
             state.recommendedValue = recommendedValue;
             state.recThresholds = thresholds || null;
+
+            // Detect purchase: value went up → find matching unit from dashboard
+            if (prevValue > 0 && currentValue > prevValue && state.dashboardActions) {
+                var delta = currentValue - prevValue;
+                trackPurchaseByDelta(delta);
+            }
+            // Detect sell: value went down → reset types (wait for Tab refresh)
+            if (prevValue > 0 && currentValue < prevValue) {
+                state.myAttackValue = {};
+                state.myDefenseValue = {};
+                state.myGrid = null;
+            }
+
             scheduleRender();
         });
 
@@ -267,6 +465,8 @@
         engine.on('refreshWindshieldActions', function (actions) {
             state.windshieldActions = actions;
             state.inGame = true;
+
+
             scheduleRender();
         });
 
@@ -291,9 +491,18 @@
 
         engine.on('refreshScoreboardInfo', function (scoreboardInfo) {
             state.scoreboardPlayers = scoreboardInfo;
-            // Only cache when viewing enemy fighters (Tab+Space)
-            if (showingEnemies && scoreboardInfo && scoreboardInfo.length) {
-                cacheDefenderGrid(scoreboardInfo);
+            // Scouting: capture player names from every scoreboard event
+            if (scoreboardInfo && scoreboardInfo.length) {
+                captureScoutingFromScoreboard(scoreboardInfo);
+            }
+            if (scoreboardInfo && scoreboardInfo.length) {
+                if (showingEnemies) {
+                    // Tab+Space: cache enemy fighters
+                    cacheDefenderGrid(scoreboardInfo);
+                } else {
+                    // Tab only: cache our own fighters
+                    cacheMyGrid(scoreboardInfo);
+                }
                 scheduleRender();
             }
         });
@@ -334,12 +543,20 @@
         document.body.appendChild(mercRoot);
         restorePosition(mercRoot, STORAGE_KEY_MERC);
 
+        // Scouting panel
+        var scoutRoot = document.createElement('div');
+        scoutRoot.id = SCOUT_ID;
+        scoutRoot.className = 'sc-panel';
+        document.body.appendChild(scoutRoot);
+        restorePosition(scoutRoot, STORAGE_KEY_SCOUT);
+
         bindGameEvents();
         initDrag();
         renderFighter();
         renderMerc();
+        renderScouting();
 
-        console.log('[SmartOverlay] Initialized (fighter + merc panels).');
+        console.log('[SmartOverlay] Initialized (fighter + merc + scouting panels).');
     }
 
     // =========================================================================
@@ -372,8 +589,41 @@
             state.dashboardActions, state.waveNum, state.gold
         );
 
+        // Defense strength: current board types + value vs recommended
+        var defStrength = null;
+        if (eng.evaluateDefenseStrength && state.myGrid) {
+
+            var typeResult = eng.evaluateDefenseStrength(
+                state.waveNum, state.myDefenseValue, state.myAttackValue
+            );
+
+            if (typeResult) {
+                var typeScore = typeResult.score;
+
+                var valueScore = 0;
+                if (state.recommendedValue > 0 && state.currentValue > 0) {
+                    valueScore = (state.currentValue - state.recommendedValue) / state.recommendedValue;
+                }
+
+                // Value and types roughly equal weight
+                var combined = typeScore + valueScore * 1.0;
+                var rec = 'NEUTRAL';
+                if (combined > 0.04) rec = 'STRONG';
+                else if (combined < -0.04) rec = 'WEAK';
+                defStrength = {
+                    recommendation: rec,
+                    combined: combined,
+                    typeScore: typeScore,
+                    valueScore: valueScore,
+                    waveDmgType: typeResult.waveDmgType,
+                    waveDefType: typeResult.waveDefType
+                };
+            }
+        }
+
         root.innerHTML = renderFighterHeader() +
             renderWaveInfo(result.wave) +
+            renderDefenseStrength(defStrength) +
             renderFighterRecs(result.recommendations) +
             renderFighterFooter(result.totalScored);
 
@@ -415,6 +665,27 @@
                 '<span class="so-type-badge so-def" title="Wave defense type">' +
                     escapeHtml(wave.defType) + '</span>' +
             '</div>' +
+            '</div>';
+    }
+
+    function renderDefenseStrength(ds) {
+        if (!ds) return '';
+        var cls = 'so-ds-neutral';
+        if (ds.recommendation === 'STRONG') cls = 'so-ds-strong';
+        else if (ds.recommendation === 'WEAK') cls = 'so-ds-weak';
+
+        var detail = '';
+        if (ds.recommendation === 'STRONG') {
+            detail = 'Good vs ' + ds.waveDefType + ' wave';
+        } else if (ds.recommendation === 'WEAK') {
+            detail = 'Weak vs ' + ds.waveDmgType + ' wave';
+        } else {
+            detail = 'Balanced matchup';
+        }
+
+        return '<div class="so-defense-strength ' + cls + '">' +
+            '<span class="so-ds-label">' + ds.recommendation + '</span>' +
+            '<span class="so-ds-detail">' + escapeHtml(detail) + '</span>' +
             '</div>';
     }
 
@@ -506,12 +777,25 @@
             state.mythium
         );
 
+        // Evaluate PUSH/HOLD forecast for current wave + next 4
+        var pushForecast = [];
+        if (eng.evaluatePushHold && result.totalFighters > 0) {
+            for (var fw = state.waveNum; fw < state.waveNum + 5; fw++) {
+                var ph = eng.evaluatePushHold(fw, result.defenseValue, result.attackValue);
+                if (ph) {
+                    ph.waveNum = fw;
+                    pushForecast.push(ph);
+                }
+            }
+        }
+
         // Save scroll position before re-rendering
         var oldRecList = document.getElementById('mo-rec-list');
         var savedScroll = oldRecList ? oldRecList.scrollTop : 0;
 
         root.innerHTML = renderMercHeader() +
             renderDefenseBreakdown(result) +
+            renderPushForecast(pushForecast) +
             renderMercRecs(result.recommendations) +
             renderMercFooter(result.totalScored);
 
@@ -578,25 +862,20 @@
         var defName = state.defenderNamePlain || 'Unknown';
         var btnLabel = state.mercMinimized ? '+' : '\u2013';
 
-        // Build center info: "995g (-5) | 120 myth"
-        var infoParts = [];
+        // Build center info as individual flex children
+        var infoHtml = '';
         if (state.defenderValue > 0) {
             var assess = getValueAssessment(state.defenderValueDelta);
-            var valText = state.defenderValue + 'g';
+            infoHtml += '<span class="mo-info-val">' + state.defenderValue + 'g</span>';
             if (assess.label) {
-                valText += ' <span class="mo-val-badge ' + assess.cls + '">' + assess.label + '</span>';
+                infoHtml += '<span class="mo-val-badge ' + assess.cls + '">' + assess.label + '</span>';
             }
-            infoParts.push(valText);
         }
-        if (state.mythium > 0) {
-            infoParts.push(state.mythium + ' myth');
-        }
-        var infoText = infoParts.length > 0 ? infoParts.join(' | ') : '';
 
         // Single header row: title | info | button (mirrors fighter header)
         var html = '<div class="mo-header">' +
             '<span class="mo-header-title">Merc Advisor</span>' +
-            '<span class="mo-header-info">' + infoText + '</span>' +
+            '<span class="mo-header-info">' + infoHtml + '</span>' +
             '<button id="mo-minimize-btn" class="mo-toggle-btn" tabindex="-1">' + btnLabel + '</button>' +
             '</div>';
 
@@ -664,6 +943,23 @@
         return html + '</div>';
     }
 
+    function renderPushForecast(forecast) {
+        if (!forecast || forecast.length === 0) return '';
+        var html = '<div class="mo-forecast">';
+        for (var i = 0; i < forecast.length; i++) {
+            var ph = forecast[i];
+            var cls = ph.recommendation === 'PUSH' ? 'mo-fc-push' : 'mo-fc-hold';
+            if (i === 0) cls += ' mo-fc-current';
+            html += '<div class="mo-fc-chip ' + cls + '" title="' +
+                escapeAttr(ph.waveDmgType + ' atk / ' + ph.waveDefType + ' def') + '">' +
+                '<span class="mo-fc-wave">W' + ph.waveNum + '</span>' +
+                '<span class="mo-fc-label">' + ph.recommendation + '</span>' +
+                '</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
     function renderMercRecs(recs) {
         if (!recs || recs.length === 0) return '<div class="so-empty">No mercs available</div>';
         var html = '<div id="mo-rec-list" class="mo-recommendations">';
@@ -702,7 +998,7 @@
             '<div class="so-unit-details">' +
                 '<div class="so-unit-name">' + escapeHtml(unit.name || 'Unknown') + '</div>' +
                 '<div class="so-unit-meta">' +
-                    '<span class="so-unit-cost">' + rec.cost + ' myth</span>' +
+                    '<span class="so-unit-cost">' + (rec.cost > 0 ? rec.cost + ' myth' : '') + '</span>' +
                     '<span>' + escapeHtml(unit.attackType || '?') + ' / ' +
                         escapeHtml(unit.armorType || '?') + '</span>' +
                 '</div>' +
@@ -720,6 +1016,161 @@
     }
 
     // =========================================================================
+    //  Scouting panel rendering
+    // =========================================================================
+
+    function renderScouting() {
+        if (dragTarget) return;
+
+        var root = document.getElementById(SCOUT_ID);
+        if (!root) return;
+
+        root.className = 'sc-panel';
+
+        // Show only when visible (user hasn't closed it) and we have data
+        if (!state.scoutingVisible) {
+            addClass(root, 'so-hidden');
+            root.innerHTML = '';
+            return;
+        }
+
+        var opponents = [];
+        var allies = [];
+        for (var num in state.scoutingPlayers) {
+            if (!state.scoutingPlayers.hasOwnProperty(num)) continue;
+            var p = state.scoutingPlayers[num];
+            if (p.isAlly) {
+                allies.push(p);
+            } else {
+                opponents.push(p);
+            }
+        }
+
+        var html = renderScoutHeader();
+
+        if (opponents.length > 0) {
+            html += '<div class="sc-section-label">Opponents</div>';
+            for (var i = 0; i < opponents.length; i++) {
+                html += renderScoutCard(opponents[i]);
+            }
+        }
+        if (allies.length > 0) {
+            html += '<div class="sc-section-label">Allies</div>';
+            for (var j = 0; j < allies.length; j++) {
+                html += renderScoutCard(allies[j]);
+            }
+        }
+
+        if (opponents.length === 0 && allies.length === 0) {
+            html += '<div class="so-empty">Waiting for players...</div>';
+        }
+
+        root.innerHTML = html;
+        bindScoutCloseBtn();
+    }
+
+    function bindScoutCloseBtn() {
+        var btn = document.getElementById('sc-close-btn');
+        if (btn) {
+            btn.onclick = function () {
+                state.scoutingVisible = false;
+                renderScouting();
+            };
+        }
+    }
+
+    function renderScoutHeader() {
+        // Try to get the API's "Last N Games" string from the first player with data
+        var lastNText = '';
+        for (var key in state.scoutingPlayers) {
+            if (!state.scoutingPlayers.hasOwnProperty(key)) continue;
+            var p = state.scoutingPlayers[key];
+            if (p.data && p.data.String) {
+                lastNText = p.data.String;
+                break;
+            }
+        }
+        var subtitle = lastNText
+            ? '<span class="sc-header-subtitle">' + escapeHtml(lastNText) + '</span>'
+            : '';
+        return '<div class="sc-header">' +
+            '<span class="sc-header-title">Scouting</span>' +
+            subtitle +
+            '<button id="sc-close-btn" class="sc-toggle-btn" tabindex="-1">\u00d7</button>' +
+            '</div>';
+    }
+
+    function stripHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/<[^>]+>/g, '').trim();
+    }
+
+    function renderScoutCard(player) {
+        var html = '<div class="sc-player-card">';
+        var plainName = stripHtml(player.name) || '???';
+
+        // Header: name as simple block div (Coherent GT flex bugs collapse spans)
+        html += '<div class="sc-player-name">' + escapeHtml(plainName) + '</div>';
+
+        if (player.loading) {
+            html += '<div class="sc-stats sc-loading">Loading...</div>';
+        } else if (player.error || !player.data) {
+            html += '<div class="sc-stats sc-error">No data</div>';
+        } else {
+            var d = player.data;
+            // W/L + Elo on one line
+            var wins = (d.WinLose && d.WinLose.Wins) || 0;
+            var losses = (d.WinLose && d.WinLose.Losses) || 0;
+            var elo = d.EloChange || 0;
+            var eloStr = elo >= 0 ? '+' + elo : '' + elo;
+            html += '<div class="sc-stats">' +
+                '<span class="sc-wl">' + wins + 'W-' + losses + 'L</span>' +
+                '<span class="sc-elo ' + (elo >= 0 ? 'sc-elo-pos' : 'sc-elo-neg') + '">' + eloStr + ' Elo</span>' +
+                '</div>';
+
+            // Top 3 Masterminds
+            if (d.Masterminds) {
+                html += renderScoutIcons(d.Masterminds, 'hud/img/icons/Items/', 'MMs');
+            }
+            // Top 3 Wave 1 units
+            if (d.Wave1) {
+                html += renderScoutIcons(d.Wave1, 'hud/img/icons/', 'W1');
+            }
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    function renderScoutIcons(map, basePath, label) {
+        // Sort by count descending, take top 3
+        var entries = [];
+        for (var name in map) {
+            if (map.hasOwnProperty(name)) {
+                entries.push({ name: name, count: map[name] });
+            }
+        }
+        entries.sort(function (a, b) { return b.count - a.count; });
+        if (entries.length > 3) entries = entries.slice(0, 3);
+        if (entries.length === 0) return '';
+
+        var html = '<div class="sc-icons-row">';
+        html += '<span class="sc-icons-label">' + escapeHtml(label) + '</span>';
+        for (var i = 0; i < entries.length; i++) {
+            var iconSrc = basePath + escapeAttr(entries[i].name) + '.png';
+            var prettyName = entries[i].name.replace(/_/g, ' ');
+            html += '<span class="sc-icon-item" title="' + escapeAttr(prettyName) + ' (' + entries[i].count + ')">' +
+                '<img class="sc-icon-img" src="' + iconSrc +
+                    '" alt="' + escapeAttr(prettyName) +
+                    '" onerror="this.style.display=\'none\'">' +
+                '<span class="sc-icon-count">' + entries[i].count + '</span>' +
+                '</span>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    // =========================================================================
     //  Public API
     // =========================================================================
 
@@ -727,6 +1178,7 @@
         init: init,
         renderFighter: renderFighter,
         renderMerc: renderMerc,
+        renderScouting: renderScouting,
         setState: function (newState) {
             for (var key in newState) {
                 if (newState.hasOwnProperty(key)) {
@@ -735,6 +1187,7 @@
             }
             renderFighter();
             renderMerc();
+            renderScouting();
         },
         getState: function () { return state; }
     };

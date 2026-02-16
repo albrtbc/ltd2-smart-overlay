@@ -4,7 +4,8 @@
    Shared panel base
    ============================================================ */
 .so-panel,
-.mo-panel {
+.mo-panel,
+.sc-panel {
     position: fixed;
     width: 340px;
     max-height: 500px;
@@ -103,16 +104,19 @@
 }
 
 .mo-header-info {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-size: 12px;
     color: #aa8866;
 }
 
-.mo-header-info .mo-val-badge {
-    vertical-align: baseline;
+.mo-info-sep {
+    color: rgba(170, 136, 102, 0.5);
 }
 
 .mo-name-bar {
-    padding: 0 12px 6px;
+    padding: 2px 12px 6px;
     background: rgba(50, 35, 20, 0.8);
     border-bottom: 1px solid rgba(180, 120, 80, 0.4);
     font-size: 13px;
@@ -120,7 +124,7 @@
     color: #e8c8a0;
     cursor: move;
     white-space: nowrap;
-    overflow: hidden;
+    overflow: visible;
     text-overflow: ellipsis;
 }
 
@@ -335,6 +339,67 @@
     background: rgba(180, 180, 180, 0.4);
 }
 
+/* ============================================================
+   PUSH/HOLD forecast (merc panel)
+   ============================================================ */
+.mo-forecast {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    gap: 4px;
+}
+
+.mo-fc-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3px 6px;
+    border-radius: 4px;
+    min-width: 42px;
+    flex: 1;
+}
+
+.mo-fc-wave {
+    font-size: 9px;
+    font-weight: 600;
+    opacity: 0.7;
+    letter-spacing: 0.3px;
+}
+
+.mo-fc-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.mo-fc-push {
+    background: rgba(40, 160, 80, 0.2);
+    border: 1px solid rgba(40, 160, 80, 0.4);
+    color: #5eff5e;
+}
+
+.mo-fc-hold {
+    background: rgba(200, 120, 40, 0.2);
+    border: 1px solid rgba(200, 120, 40, 0.4);
+    color: #ffaa44;
+}
+
+.mo-fc-current {
+    border-width: 2px;
+    padding: 2px 5px;
+}
+
+.mo-fc-current.mo-fc-push {
+    background: rgba(40, 160, 80, 0.35);
+    border-color: rgba(40, 160, 80, 0.7);
+}
+
+.mo-fc-current.mo-fc-hold {
+    background: rgba(200, 120, 40, 0.35);
+    border-color: rgba(200, 120, 40, 0.7);
+}
+
 /* Attack type colors (Pierce, Impact, Magic, Pure) */
 .mo-def-chip.mo-def-pierce {
     background: rgba(200, 80, 80, 0.2);
@@ -370,6 +435,48 @@
 }
 .mo-def-bar-fill.mo-def-pure {
     background: rgba(200, 200, 200, 0.4);
+}
+
+/* ============================================================
+   Defense STRONG/WEAK/NEUTRAL indicator (fighter panel)
+   ============================================================ */
+.so-defense-strength {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 12px;
+    gap: 8px;
+    border-radius: 4px;
+    margin: 4px 10px;
+}
+
+.so-ds-label {
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+.so-ds-detail {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.so-ds-strong {
+    background: rgba(40, 160, 80, 0.25);
+    border: 1px solid rgba(40, 160, 80, 0.5);
+    color: #5eff5e;
+}
+
+.so-ds-weak {
+    background: rgba(200, 60, 60, 0.25);
+    border: 1px solid rgba(200, 60, 60, 0.5);
+    color: #f08080;
+}
+
+.so-ds-neutral {
+    background: rgba(120, 120, 120, 0.2);
+    border: 1px solid rgba(120, 120, 120, 0.4);
+    color: #99aabb;
 }
 
 /* ============================================================
@@ -620,12 +727,190 @@
    Minimized state (hides body content, keeps header)
    ============================================================ */
 .so-minimized .so-wave-info,
+.so-minimized .so-defense-strength,
 .so-minimized .so-recommendations,
 .so-minimized .mo-name-bar,
 .so-minimized .mo-defense-bar,
+.so-minimized .mo-forecast,
 .so-minimized .mo-recommendations,
 .so-minimized .so-footer,
 .so-minimized .so-waiting,
 .so-minimized .so-empty {
     display: none;
+}
+
+/* ============================================================
+   Scouting panel (teal/cyan accent — loading screen)
+   ============================================================ */
+.sc-panel {
+    width: 420px;
+    max-height: 600px;
+    top: 10px;
+    left: 10px;
+    border-color: rgba(0, 200, 200, 0.6);
+    overflow-y: auto;
+}
+
+.sc-panel::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sc-panel::-webkit-scrollbar-thumb {
+    background: rgba(0, 200, 200, 0.4);
+    border-radius: 2px;
+}
+
+/* --- Scouting header --- */
+.sc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(15, 50, 55, 0.85);
+    border-bottom: 1px solid rgba(0, 200, 200, 0.3);
+    cursor: move;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.sc-header-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #70e8e8;
+}
+
+.sc-toggle-btn {
+    background: none;
+    border: 1px solid rgba(0, 200, 200, 0.5);
+    border-radius: 3px;
+    color: #60bbbb;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.sc-toggle-btn:hover {
+    color: #70e8e8;
+    border-color: rgba(0, 200, 200, 0.8);
+}
+
+/* --- Section dividers --- */
+.sc-section-label {
+    padding: 5px 12px 3px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #60bbbb;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(15, 40, 45, 0.5);
+    border-bottom: 1px solid rgba(0, 200, 200, 0.15);
+}
+
+/* --- Player card --- */
+.sc-player-card {
+    padding: 6px 12px;
+    border-bottom: 1px solid rgba(0, 200, 200, 0.1);
+}
+
+.sc-player-card:last-child {
+    border-bottom: none;
+}
+
+.sc-player-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #70e8e8;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sc-player-rating {
+    font-size: 11px;
+    color: #70e8e8;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+/* --- Stats row (W/L + Elo) --- */
+.sc-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    margin-bottom: 3px;
+}
+
+.sc-loading {
+    color: #60bbbb;
+    font-style: italic;
+}
+
+.sc-error {
+    color: #aa7777;
+    font-style: italic;
+}
+
+.sc-wl {
+    color: #bbccdd;
+}
+
+.sc-elo {
+    font-weight: 600;
+}
+
+.sc-elo-pos {
+    color: #80d080;
+}
+
+.sc-elo-neg {
+    color: #f09090;
+}
+
+/* --- Icon rows (MMs / Wave1) --- */
+.sc-icons-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.sc-icons-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #60bbbb;
+    width: 24px;
+    flex-shrink: 0;
+}
+
+.sc-icon-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.sc-icon-img {
+    width: 28px;
+    height: 28px;
+    border-radius: 3px;
+    border: 1px solid rgba(0, 200, 200, 0.25);
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.sc-icon-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: #aabbcc;
+}
+
+/* Scouting header subtitle (Last N Games) */
+.sc-header-subtitle {
+    font-size: 11px;
+    color: #60bbbb;
+    font-weight: 400;
 }

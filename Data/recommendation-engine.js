@@ -266,6 +266,16 @@ var SmartOverlayEngine = (function () {
     }
 
     /**
+     * Extracts mythium cost from windshield action subheader HTML.
+     * e.g. "<img .../> <span style='color: #33bbbb'>20</span>" -> 20
+     */
+    function extractMythiumCost(subheader) {
+        if (!subheader) return 0;
+        var match = subheader.match(/>(\d+)<\/span>/);
+        return match ? parseInt(match[1], 10) : 0;
+    }
+
+    /**
      * Extracts the keyboard shortcut from dashboard action header HTML.
      * e.g. "<b>Deploy Peewee</b> <span...>[Q]</span>" -> "Q"
      */
@@ -286,6 +296,19 @@ var SmartOverlayEngine = (function () {
         for (var i = 0; i < units.length; i++) {
             var key = extractIconName(units[i].iconPath);
             if (key) map[key] = units[i];
+        }
+        return map;
+    }
+
+    /**
+     * Builds a lookup map from unit name (lowercase) to unit object.
+     */
+    function buildNameLookup() {
+        if (!window.SmartOverlayUnits) return {};
+        var units = window.SmartOverlayUnits;
+        var map = {};
+        for (var i = 0; i < units.length; i++) {
+            if (units[i].name) map[units[i].name.toLowerCase()] = units[i];
         }
         return map;
     }
@@ -406,6 +429,7 @@ var SmartOverlayEngine = (function () {
         }
 
         var iconLookup = buildIconLookup();
+        var nameLookup = buildNameLookup();
         var defBreakdown = {};  // count per armor type
         var atkBreakdown = {};  // count per attack type
         var defValue = {};      // gold value per armor type
@@ -415,10 +439,14 @@ var SmartOverlayEngine = (function () {
 
         for (var i = 0; i < grid.length; i++) {
             var tower = grid[i];
-            if (!tower.image) continue;
+            if (!tower.image && !tower.name) continue;
 
             var iconKey = extractIconName(tower.image);
             var dbUnit = iconKey ? iconLookup[iconKey] : null;
+            // Fallback: lookup by name if icon didn't match
+            if (!dbUnit && tower.name) {
+                dbUnit = nameLookup[tower.name.toLowerCase()] || null;
+            }
 
             if (dbUnit) {
                 var armor = dbUnit.armorType || 'Unknown';
@@ -485,7 +513,8 @@ var SmartOverlayEngine = (function () {
             var iconKey = extractIconName(action.image);
             var dbUnit = iconKey ? iconLookup[iconKey] : null;
             var shortcut = extractShortcutFromHeader(action.header);
-            var cost = action.goldCost || 0;
+            // Merc cost is mythium, stored in subheader HTML, not goldCost
+            var cost = action.goldCost || extractMythiumCost(action.subheader) || 0;
             var canAfford = currentMythium > 0 ? cost <= currentMythium : !action.grayedOut;
             // "Near affordable" = within 30 mythium of being able to buy
             var nearAffordable = !canAfford && currentMythium > 0 && cost <= currentMythium + 30;
@@ -582,11 +611,169 @@ var SmartOverlayEngine = (function () {
         return result;
     }
 
+    /**
+     * Evaluates whether to PUSH (send mercs) or HOLD (save mythium) based on
+     * how the current wave's type matchups interact with the opponent's army.
+     *
+     * @param {number} waveNum - Current wave number.
+     * @param {Object} defenseValue - Opponent armor types keyed by gold value.
+     * @param {Object} attackValue - Opponent attack types keyed by gold value.
+     * @returns {Object|null} { recommendation, score, waveOffAvg, oppKillAvg, waveName, waveDmgType, waveDefType }
+     */
+    function evaluatePushHold(waveNum, defenseValue, attackValue) {
+        var wave = findWave(waveNum);
+        if (!wave) return null;
+
+        // How well does this wave's attack threaten the opponent's army?
+        var waveOffTotal = 0, waveOffWeight = 0;
+        for (var defType in defenseValue) {
+            if (defType === 'Unknown') continue;
+            var gold = defenseValue[defType];
+            var mult = getDamageMultiplier(wave.dmgType, defType);
+            waveOffTotal += mult * gold;
+            waveOffWeight += gold;
+        }
+        var waveOffAvg = waveOffWeight > 0 ? waveOffTotal / waveOffWeight : 1.0;
+
+        // How well does the opponent's army kill this wave?
+        var oppKillTotal = 0, oppKillWeight = 0;
+        for (var atkType in attackValue) {
+            if (atkType === 'Unknown') continue;
+            var gold2 = attackValue[atkType];
+            var mult2 = getDamageMultiplier(atkType, wave.defType);
+            oppKillTotal += mult2 * gold2;
+            oppKillWeight += gold2;
+        }
+        var oppKillAvg = oppKillWeight > 0 ? oppKillTotal / oppKillWeight : 1.0;
+
+        // Score > 0 = PUSH, Score < 0 = HOLD
+        var pushScore = (waveOffAvg - 1.0) - (oppKillAvg - 1.0);
+
+        return {
+            recommendation: pushScore >= 0 ? 'PUSH' : 'HOLD',
+            score: pushScore,
+            waveOffAvg: waveOffAvg,
+            oppKillAvg: oppKillAvg,
+            waveName: wave.name,
+            waveDmgType: wave.dmgType,
+            waveDefType: wave.defType
+        };
+    }
+
+    /**
+     * Simulates optimal spending: greedily buys the best-scored units
+     * for the current wave, then returns projected type breakdown + value.
+     *
+     * @param {Object} currentDefenseValue - Current armor types by gold value.
+     * @param {Object} currentAttackValue - Current attack types by gold value.
+     * @param {number} currentValue - Current total fighter value.
+     * @param {Array}  scoredActions - Sorted recommendations from scoreFromDashboardActions.
+     * @param {number} gold - Available gold to spend.
+     * @returns {Object} { defenseValue, attackValue, projectedValue, purchaseCount }
+     */
+    function projectOptimalSpending(currentDefenseValue, currentAttackValue, currentValue, scoredActions, gold) {
+        // Clone current type maps
+        var defVal = {};
+        var atkVal = {};
+        for (var d in currentDefenseValue) {
+            if (currentDefenseValue.hasOwnProperty(d)) defVal[d] = currentDefenseValue[d];
+        }
+        for (var a in currentAttackValue) {
+            if (currentAttackValue.hasOwnProperty(a)) atkVal[a] = currentAttackValue[a];
+        }
+
+        var remaining = gold;
+        var projValue = currentValue;
+        var purchases = 0;
+
+        // Greedy: buy best-scored affordable units
+        for (var i = 0; i < scoredActions.length; i++) {
+            var rec = scoredActions[i];
+            if (rec.grayedOut) continue;
+            var cost = rec.cost || 0;
+            if (cost <= 0 || cost > remaining) continue;
+
+            var unit = rec.unit;
+            if (!unit) continue;
+
+            var armor = unit.armorType || 'Unknown';
+            var attack = unit.attackType || 'Unknown';
+
+            defVal[armor] = (defVal[armor] || 0) + cost;
+            atkVal[attack] = (atkVal[attack] || 0) + cost;
+            remaining -= cost;
+            projValue += cost;
+            purchases++;
+        }
+
+        return {
+            defenseValue: defVal,
+            attackValue: atkVal,
+            projectedValue: projValue,
+            purchaseCount: purchases
+        };
+    }
+
+    /**
+     * Evaluates how well our own army handles a given wave.
+     * STRONG = our army counters the wave type matchup.
+     * WEAK = wave type matchup is bad for us.
+     *
+     * @param {number} waveNum - Wave number to evaluate.
+     * @param {Object} myDefenseValue - Our armor types keyed by gold value.
+     * @param {Object} myAttackValue - Our attack types keyed by gold value.
+     * @returns {Object|null} { recommendation, score, ourOffAvg, waveDmgAvg, ... }
+     */
+    function evaluateDefenseStrength(waveNum, myDefenseValue, myAttackValue) {
+        var wave = findWave(waveNum);
+        if (!wave) return null;
+
+        // How well do our attacks kill this wave?
+        var ourOffTotal = 0, ourOffWeight = 0;
+        for (var atkType in myAttackValue) {
+            if (atkType === 'Unknown') continue;
+            var gold = myAttackValue[atkType];
+            var mult = getDamageMultiplier(atkType, wave.defType);
+            ourOffTotal += mult * gold;
+            ourOffWeight += gold;
+        }
+        var ourOffAvg = ourOffWeight > 0 ? ourOffTotal / ourOffWeight : 1.0;
+
+        // How well does this wave's attack hurt our army?
+        var waveDmgTotal = 0, waveDmgWeight = 0;
+        for (var defType in myDefenseValue) {
+            if (defType === 'Unknown') continue;
+            var gold2 = myDefenseValue[defType];
+            var mult2 = getDamageMultiplier(wave.dmgType, defType);
+            waveDmgTotal += mult2 * gold2;
+            waveDmgWeight += gold2;
+        }
+        var waveDmgAvg = waveDmgWeight > 0 ? waveDmgTotal / waveDmgWeight : 1.0;
+
+        // positive = STRONG, negative = WEAK
+        // Weight offense more — killing the wave fast matters most
+        var defenseScore = (ourOffAvg - 1.0) * 0.7 - (waveDmgAvg - 1.0) * 0.3;
+
+        return {
+            recommendation: defenseScore >= 0 ? 'STRONG' : 'WEAK',
+            score: defenseScore,
+            ourOffAvg: ourOffAvg,
+            waveDmgAvg: waveDmgAvg,
+            waveName: wave.name,
+            waveDmgType: wave.dmgType,
+            waveDefType: wave.defType
+        };
+    }
+
     // Public API
     return {
         getRecommendations: getRecommendations,
         scoreFromDashboardActions: scoreFromDashboardActions,
         scoreMercenaries: scoreMercenaries,
+        evaluatePushHold: evaluatePushHold,
+        evaluateDefenseStrength: evaluateDefenseStrength,
+        projectOptimalSpending: projectOptimalSpending,
+        analyzeGrid: analyzeOpponentGrid,
         getDamageMultiplier: getDamageMultiplier,
         multiplierToPercent: multiplierToPercent,
         multiplierClass: multiplierClass,
