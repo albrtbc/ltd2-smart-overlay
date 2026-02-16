@@ -106,14 +106,14 @@ jobs:
       - name: Build
         if: steps.version.outputs.skip != 'true'
         run: |
-          dotnet build LTD2SmartOverlay/LTD2SmartOverlay.sln -c Release -p:Version=${{ steps.version.outputs.version }}
+          dotnet build LTD2SmartOverlay.sln -c Release -p:Version=${{ steps.version.outputs.version }}
 
       - name: Create Release
         if: steps.version.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          DLL_PATH="LTD2SmartOverlay/bin/Release/netstandard2.1/LTD2SmartOverlay.dll"
+          DLL_PATH="bin/Release/netstandard2.1/LTD2SmartOverlay.dll"
 
           # Create git tag
           git tag "${{ steps.version.outputs.tag }}"
