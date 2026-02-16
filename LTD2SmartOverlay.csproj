@@ -9,22 +9,20 @@
     <Title>LTD2SmartOverlay</Title>
     <Authors>SmartOverlay</Authors>
     <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json
+    </RestoreAdditionalProjectSources>
   </PropertyGroup>
 
-  <!-- BepInEx + Harmony -->
+  <!-- BepInEx + Unity (NuGet) -->
   <ItemGroup>
-    <Reference Include="BepInEx">
-      <HintPath>lib\BepInEx\BepInEx.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="0Harmony">
-      <HintPath>lib\BepInEx\0Harmony.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <PackageReference Include="BepInEx.Core" Version="5.*" />
+    <PackageReference Include="UnityEngine.Modules" Version="2020.3.16" IncludeAssets="compile" />
   </ItemGroup>
 
-  <!-- Game DLL references -->
-  <ItemGroup>
+  <!-- Game DLL references (local only, optional for CI) -->
+  <ItemGroup Condition="Exists('lib\Managed\Assembly-CSharp.dll')">
     <Reference Include="Assembly-CSharp">
       <HintPath>lib\Managed\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
@@ -43,18 +41,6 @@
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>lib\Managed\Newtonsoft.Json.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="UnityEngine">
-      <HintPath>lib\Managed\UnityEngine.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule">
-      <HintPath>lib\Managed\UnityEngine.CoreModule.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>lib\Managed\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
