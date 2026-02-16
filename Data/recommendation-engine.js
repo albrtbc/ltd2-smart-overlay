@@ -225,6 +225,22 @@ var SmartOverlayEngine = (function () {
     }
 
     /**
+     * Derives a role string from unit stats (HP/DPS ratio).
+     * Used as fallback when the action object doesn't include a role.
+     * Returns 'role_tank', 'role_balanced', 'role_dps', or ''.
+     */
+    function computeRole(unit) {
+        if (!unit) return '';
+        var hp = parseFloat(unit.hp) || 0;
+        var dps = parseFloat(unit.dps) || 0;
+        if (hp <= 0 || dps <= 0) return '';
+        var ratio = hp / dps;
+        if (ratio > 27) return 'role_tank';
+        if (ratio > 17) return 'role_balanced';
+        return 'role_dps';
+    }
+
+    /**
      * Extracts the icon filename (lowercase, no extension) from a path.
      * e.g. "icons/Peewee.png" -> "peewee", "Icons/Peewee.png" -> "peewee"
      */
@@ -333,6 +349,7 @@ var SmartOverlayEngine = (function () {
                     isUpgrade: false,
                     cost: action.goldCost || cost,
                     grayedOut: !!action.grayedOut,
+                    role: action.role || computeRole(dbUnit),
                     actionIndex: action.index,
                     shortcut: shortcut,
                     canAfford: gold > 0 ? (action.goldCost || cost) <= gold : true
@@ -355,6 +372,7 @@ var SmartOverlayEngine = (function () {
                     isUpgrade: false,
                     cost: action.goldCost || 0,
                     grayedOut: !!action.grayedOut,
+                    role: action.role || '',
                     actionIndex: action.index,
                     shortcut: shortcut,
                     canAfford: gold > 0 ? (action.goldCost || 0) <= gold : true
@@ -519,19 +537,21 @@ var SmartOverlayEngine = (function () {
                     canAfford: canAfford,
                     nearAffordable: nearAffordable,
                     actionId: action.actionId != null ? action.actionId : '',
+                    role: action.role || computeRole(dbUnit),
                     actionIndex: action.index,
                     shortcut: shortcut
                 });
             } else {
                 // No opponent data or unmatched merc
                 var unitName = extractUnitNameFromHeader(action.header) || iconKey || 'Unknown';
+                var fallbackUnit = dbUnit || {
+                    name: unitName,
+                    iconPath: action.image || '',
+                    attackType: '?',
+                    armorType: '?'
+                };
                 scored.push({
-                    unit: dbUnit || {
-                        name: unitName,
-                        iconPath: action.image || '',
-                        attackType: '?',
-                        armorType: '?'
-                    },
+                    unit: fallbackUnit,
                     totalScore: 0,
                     avgOffMult: 1.0,
                     avgDefMult: 1.0,
@@ -540,6 +560,7 @@ var SmartOverlayEngine = (function () {
                     canAfford: canAfford,
                     nearAffordable: nearAffordable,
                     actionId: action.actionId != null ? action.actionId : '',
+                    role: action.role || computeRole(dbUnit),
                     actionIndex: action.index,
                     shortcut: shortcut
                 });

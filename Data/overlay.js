@@ -427,6 +427,11 @@
         return html + '</div>';
     }
 
+    function renderRoleBadge(role) {
+        if (!role) return '';
+        return '<img class="so-role-badge" src="hud/img/small-icons/' + escapeAttr(role) + '.png" alt="">';
+    }
+
     function renderFighterCard(rec) {
         var unit = rec.unit;
         var eng = window.SmartOverlayEngine;
@@ -443,8 +448,11 @@
 
         return '<div class="' + cls + '">' +
             '<span class="so-unit-key">' + escapeHtml(rec.shortcut || '?') + '</span>' +
-            '<img class="so-unit-icon" src="' + escapeAttr(iconUrl) +
-                '" alt="" onerror="this.style.display=\'none\'">' +
+            '<div class="so-icon-wrap">' +
+                '<img class="so-unit-icon" src="' + escapeAttr(iconUrl) +
+                    '" alt="" onerror="this.style.display=\'none\'">' +
+                renderRoleBadge(rec.role) +
+            '</div>' +
             '<div class="so-unit-details">' +
                 '<div class="so-unit-name">' + escapeHtml(unit.name || 'Unknown') + '</div>' +
                 '<div class="so-unit-meta">' +
@@ -570,29 +578,30 @@
         var defName = state.defenderNamePlain || 'Unknown';
         var btnLabel = state.mercMinimized ? '+' : '\u2013';
 
-        // Top row: title + opponent name + button
-        var html = '<div class="mo-header">' +
-            '<span class="mo-header-title">Merc Advisor</span>' +
-            '<span class="mo-header-name">vs ' + escapeHtml(defName) + '</span>' +
-            '<button id="mo-minimize-btn" class="mo-toggle-btn" tabindex="-1">' + btnLabel + '</button>' +
-            '</div>';
-
-        // Info bar: value + assessment (from game's delta) + mythium
+        // Build center info: "995g (-5) | 120 myth"
         var infoParts = [];
         if (state.defenderValue > 0) {
             var assess = getValueAssessment(state.defenderValueDelta);
-            var valHtml = '<span class="mo-info-value">' + state.defenderValue + 'g</span>';
+            var valText = state.defenderValue + 'g';
             if (assess.label) {
-                valHtml += ' <span class="mo-val-badge ' + assess.cls + '">' + assess.label + '</span>';
+                valText += ' <span class="mo-val-badge ' + assess.cls + '">' + assess.label + '</span>';
             }
-            infoParts.push(valHtml);
+            infoParts.push(valText);
         }
         if (state.mythium > 0) {
-            infoParts.push('<span class="mo-info-myth">' + state.mythium + ' myth</span>');
+            infoParts.push(state.mythium + ' myth');
         }
-        if (infoParts.length > 0) {
-            html += '<div class="mo-info-bar">' + infoParts.join('<span class="mo-info-sep">\u00b7</span>') + '</div>';
-        }
+        var infoText = infoParts.length > 0 ? infoParts.join(' | ') : '';
+
+        // Single header row: title | info | button (mirrors fighter header)
+        var html = '<div class="mo-header">' +
+            '<span class="mo-header-title">Merc Advisor</span>' +
+            '<span class="mo-header-info">' + infoText + '</span>' +
+            '<button id="mo-minimize-btn" class="mo-toggle-btn" tabindex="-1">' + btnLabel + '</button>' +
+            '</div>';
+
+        // Opponent name bar
+        html += '<div class="mo-name-bar">vs ' + escapeHtml(defName) + '</div>';
 
         return html;
     }
@@ -685,8 +694,11 @@
 
         return '<div class="' + cls + '"' + actionAttr + '>' +
             '<span class="so-unit-key">' + escapeHtml(rec.shortcut || '?') + '</span>' +
-            '<img class="so-unit-icon" src="' + escapeAttr(iconUrl) +
-                '" alt="" onerror="this.style.display=\'none\'">' +
+            '<div class="so-icon-wrap">' +
+                '<img class="so-unit-icon" src="' + escapeAttr(iconUrl) +
+                    '" alt="" onerror="this.style.display=\'none\'">' +
+                renderRoleBadge(rec.role) +
+            '</div>' +
             '<div class="so-unit-details">' +
                 '<div class="so-unit-name">' + escapeHtml(unit.name || 'Unknown') + '</div>' +
                 '<div class="so-unit-meta">' +
