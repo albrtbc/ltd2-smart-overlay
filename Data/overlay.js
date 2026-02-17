@@ -1542,9 +1542,9 @@
         // Update notification banner
         if (state.updateAvailable && !state.updateDismissed) {
             html += '<div class="so-update-banner">' +
-                '<a class="so-update-link" href="' + escapeAttr(state.updateAvailable.url) + '" target="_blank">' +
-                    'Update v' + escapeHtml(state.updateAvailable.version) + ' available!' +
-                '</a>' +
+                '<span class="so-update-text">' +
+                    'v' + escapeHtml(state.updateAvailable.version) + ' available on GitHub!' +
+                '</span>' +
                 '<button id="so-update-dismiss" class="so-update-close" tabindex="-1">\u00d7</button>' +
                 '</div>';
         }
@@ -1588,9 +1588,13 @@
             return;
         }
 
+        var versionLabel = OVERLAY_VERSION === '0.0.0' ? 'dev' : 'v' + OVERLAY_VERSION;
         var html = '<div class="sg-header">' +
             '<span class="sg-header-title">Smart Overlay Settings</span>' +
-            '<button id="sg-close-btn" class="sg-toggle-btn" tabindex="-1">\u00d7</button>' +
+            '<span class="sg-header-right">' +
+                '<span class="sg-header-version">' + escapeHtml(versionLabel) + '</span>' +
+                '<button id="sg-close-btn" class="sg-toggle-btn" tabindex="-1">\u00d7</button>' +
+            '</span>' +
             '</div>';
 
         html += renderToggleRow('showScouting', 'Scouting',
