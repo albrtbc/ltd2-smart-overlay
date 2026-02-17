@@ -1142,3 +1142,53 @@
     font-weight: 900;
     letter-spacing: 1px;
 }
+
+/* ============================================================
+   Update notification banner (shown on main menu SOS button)
+   ============================================================ */
+.so-update-banner {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(30, 28, 15, 0.92);
+    border: 1px solid rgba(220, 180, 40, 0.6);
+    border-radius: 5px;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    z-index: 10001;
+}
+
+.so-update-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: #f0d060;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.so-update-link:hover {
+    color: #ffe080;
+    text-decoration: underline;
+}
+
+.so-update-close {
+    background: none;
+    border: 1px solid rgba(220, 180, 40, 0.4);
+    border-radius: 3px;
+    color: #aa9944;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 12px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.so-update-close:hover {
+    color: #f0d060;
+    border-color: rgba(220, 180, 40, 0.7);
+}

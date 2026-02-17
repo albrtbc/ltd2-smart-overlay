@@ -23,6 +23,8 @@
     var MAINMENU_ID = 'so-mainmenu-link';
     var SCOUT_API = 'https://stats.drachbot.site/api/drachbot_overlay/';
     var RENDER_DEBOUNCE_MS = 100;
+    var OVERLAY_VERSION = '0.0.0';
+    var GITHUB_API_LATEST = 'https://api.github.com/repos/albrtbc/ltd2-smart-overlay/releases/latest';
 
     // --- Shared state ---
     var state = {
@@ -65,7 +67,10 @@
         showHotkeyBadges: true,
         showMercAdviser: true,
         showPushForecast: true,
-        showDefenseStrength: true
+        showDefenseStrength: true,
+        // Update notification
+        updateAvailable: null,   // {version, url} when a newer release exists
+        updateDismissed: false
     };
 
     var renderTimer = null;
@@ -373,6 +378,63 @@
             }
             scheduleRender();
         };
+        xhr.send();
+    }
+
+    // =========================================================================
+    //  Update check
+    // =========================================================================
+
+    function compareVersions(a, b) {
+        var pa = a.replace(/^v/, '').split('.');
+        var pb = b.replace(/^v/, '').split('.');
+        for (var i = 0; i < 3; i++) {
+            var na = parseInt(pa[i] || '0', 10);
+            var nb = parseInt(pb[i] || '0', 10);
+            if (na < nb) return -1;
+            if (na > nb) return 1;
+        }
+        return 0;
+    }
+
+    function checkForUpdates() {
+        if (OVERLAY_VERSION === '0.0.0') return; // dev mode
+
+        // Check if user already dismissed this or a newer version
+        try {
+            var dismissed = localStorage.getItem('dismissed_update_version');
+            if (dismissed && compareVersions(dismissed, OVERLAY_VERSION) > 0) {
+                // Already dismissed a version newer than current — skip check
+                return;
+            }
+        } catch (e) { /* ignore */ }
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', GITHUB_API_LATEST, true);
+        xhr.timeout = 10000;
+        xhr.onload = function () {
+            if (xhr.status !== 200) return;
+            try {
+                var data = JSON.parse(xhr.responseText);
+                var latestTag = data.tag_name || '';
+                var latestVersion = latestTag.replace(/^v/, '');
+                if (compareVersions(OVERLAY_VERSION, latestVersion) < 0) {
+                    // Check if this specific version was dismissed
+                    try {
+                        var dismissed = localStorage.getItem('dismissed_update_version');
+                        if (dismissed === latestVersion) return;
+                    } catch (e) { /* ignore */ }
+
+                    state.updateAvailable = {
+                        version: latestVersion,
+                        url: data.html_url || ''
+                    };
+                    renderMainMenuLink();
+                    console.log('[SmartOverlay] Update available: v' + latestVersion);
+                }
+            } catch (e) { /* ignore parse errors */ }
+        };
+        xhr.onerror = xhr.ontimeout = function () { /* silent fail */ };
         xhr.send();
     }
 
@@ -824,6 +886,7 @@
         renderMerc();
         renderScouting();
         renderMainMenuLink();
+        checkForUpdates();
 
         console.log('[SmartOverlay] Initialized (fighter + merc + scouting + settings panels).');
     }
@@ -1466,12 +1529,40 @@
         }
 
         root.className = 'so-mm-btn';
-        root.innerHTML = 'SOS';
 
-        root.onclick = function () {
+        var html = 'SOS';
+
+        // Update notification banner
+        if (state.updateAvailable && !state.updateDismissed) {
+            html += '<div class="so-update-banner">' +
+                '<a class="so-update-link" href="' + escapeAttr(state.updateAvailable.url) + '" target="_blank">' +
+                    'Update v' + escapeHtml(state.updateAvailable.version) + ' available!' +
+                '</a>' +
+                '<button id="so-update-dismiss" class="so-update-close" tabindex="-1">\u00d7</button>' +
+                '</div>';
+        }
+
+        root.innerHTML = html;
+
+        root.onclick = function (e) {
+            // Don't toggle settings when clicking the update banner
+            if (findAncestorWithClass(e.target, 'so-update-banner')) return;
             state.settingsVisible = !state.settingsVisible;
             renderSettings();
         };
+
+        // Bind dismiss button
+        var dismissBtn = document.getElementById('so-update-dismiss');
+        if (dismissBtn) {
+            dismissBtn.onclick = function (e) {
+                e.stopPropagation();
+                state.updateDismissed = true;
+                try {
+                    localStorage.setItem('dismissed_update_version', state.updateAvailable.version);
+                } catch (ex) { /* ignore */ }
+                renderMainMenuLink();
+            };
+        }
     }
 
     // =========================================================================

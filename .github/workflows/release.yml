@@ -103,6 +103,12 @@ jobs:
           echo -e "$CHANGELOG" > /tmp/changelog.md
           echo "changelog_file=/tmp/changelog.md" >> "$GITHUB_OUTPUT"
 
+      - name: Inject version into overlay JS
+        if: steps.version.outputs.skip != 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/var OVERLAY_VERSION = '0.0.0'/var OVERLAY_VERSION = '$VERSION'/" Data/overlay.js
+
       - name: Build
         if: steps.version.outputs.skip != 'true'
         run: |
