@@ -7,14 +7,14 @@
 .mo-panel,
 .sc-panel {
     position: fixed;
-    width: 340px;
-    max-height: 500px;
+    width: 360px;
+    max-height: 540px;
     background: rgba(15, 22, 36, 0.92);
     border: 1px solid rgba(85, 134, 138, 0.7);
     border-radius: 6px;
     color: #e0e8ef;
     font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 13px;
+    font-size: 14px;
     z-index: 9999;
     overflow: hidden;
     user-select: none;
@@ -22,16 +22,16 @@
     transition: opacity 0.2s ease;
 }
 
-/* Fighter panel default position */
+/* Fighter panel default position (top-left, same padding as SOS button) */
 .so-panel {
-    top: 10px;
-    right: 10px;
+    top: 12px;
+    left: 12px;
 }
 
-/* Merc panel default position (below fighter) */
+/* Merc panel default position (below fighter panel) */
 .mo-panel {
-    top: 10px;
-    right: 360px;
+    top: 420px;
+    left: 12px;
     border-color: rgba(180, 120, 80, 0.7);
 }
 
@@ -52,20 +52,20 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: rgba(30, 50, 70, 0.8);
     border-bottom: 1px solid rgba(85, 134, 138, 0.4);
     cursor: move;
 }
 
 .so-header-title {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: #a8d8ea;
 }
 
 .so-header-wave {
-    font-size: 12px;
+    font-size: 13px;
     color: #8899aa;
 }
 
@@ -75,8 +75,8 @@
     border-radius: 3px;
     color: #8899aa;
     cursor: pointer;
-    padding: 2px 6px;
-    font-size: 11px;
+    padding: 3px 7px;
+    font-size: 12px;
 }
 
 .so-toggle-btn:hover {
@@ -91,14 +91,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: rgba(50, 35, 20, 0.8);
     border-bottom: none;
     cursor: move;
 }
 
 .mo-header-title {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: #e8c8a0;
 }
@@ -107,7 +107,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
+    font-size: 13px;
     color: #aa8866;
 }
 
@@ -116,10 +116,10 @@
 }
 
 .mo-name-bar {
-    padding: 2px 12px 6px;
+    padding: 4px 14px 8px;
     background: rgba(50, 35, 20, 0.8);
     border-bottom: 1px solid rgba(180, 120, 80, 0.4);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: #e8c8a0;
     cursor: move;
@@ -130,9 +130,9 @@
 
 .mo-val-badge {
     display: inline-block;
-    padding: 1px 5px;
+    padding: 2px 6px;
     border-radius: 3px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     vertical-align: middle;
     letter-spacing: 0.3px;
@@ -159,8 +159,8 @@
     border-radius: 3px;
     color: #aa8866;
     cursor: pointer;
-    padding: 2px 6px;
-    font-size: 11px;
+    padding: 3px 7px;
+    font-size: 12px;
     flex-shrink: 0;
 }
 
@@ -175,10 +175,10 @@
 .so-wave-info {
     display: flex;
     flex-direction: column;
-    padding: 6px 12px;
+    padding: 8px 14px;
     background: rgba(25, 40, 58, 0.6);
     border-bottom: 1px solid rgba(85, 134, 138, 0.2);
-    gap: 4px;
+    gap: 6px;
 }
 
 .so-wave-creature {
@@ -198,9 +198,9 @@
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    padding: 2px 6px;
+    padding: 3px 8px;
     border-radius: 3px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
 }
 
@@ -222,14 +222,14 @@
 .mo-defense-bar {
     display: flex;
     flex-direction: column;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: rgba(40, 30, 20, 0.6);
     border-bottom: 1px solid rgba(180, 120, 80, 0.2);
-    gap: 3px;
+    gap: 4px;
 }
 
 .mo-defense-label {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     color: #aa8866;
     text-transform: uppercase;
@@ -242,7 +242,7 @@
 }
 
 .mo-defense-hint {
-    font-size: 11px;
+    font-size: 12px;
     color: #aa8866;
     font-style: italic;
     text-align: center;
@@ -253,15 +253,15 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    height: 20px;
+    height: 22px;
 }
 
 .mo-def-chip {
     display: inline-flex;
     align-items: center;
-    padding: 1px 6px;
+    padding: 2px 6px;
     border-radius: 3px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     background: rgba(120, 120, 120, 0.2);
     color: #bbccdd;
@@ -286,7 +286,7 @@
 }
 
 .mo-def-count {
-    font-size: 10px;
+    font-size: 11px;
     color: #f0d060;
     min-width: 32px;
     text-align: right;
@@ -346,29 +346,29 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 6px 10px;
-    gap: 4px;
+    padding: 8px 12px;
+    gap: 5px;
 }
 
 .mo-fc-chip {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 3px 6px;
+    padding: 4px 8px;
     border-radius: 4px;
-    min-width: 42px;
+    min-width: 46px;
     flex: 1;
 }
 
 .mo-fc-wave {
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 600;
     opacity: 0.7;
     letter-spacing: 0.3px;
 }
 
 .mo-fc-label {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.5px;
 }
@@ -444,20 +444,20 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 5px 12px;
-    gap: 8px;
+    padding: 7px 14px;
+    gap: 10px;
     border-radius: 4px;
-    margin: 4px 10px;
+    margin: 6px 12px;
 }
 
 .so-ds-label {
     font-weight: 700;
-    font-size: 12px;
+    font-size: 13px;
     letter-spacing: 0.5px;
 }
 
 .so-ds-detail {
-    font-size: 11px;
+    font-size: 12px;
     opacity: 0.8;
 }
 
@@ -507,8 +507,8 @@
 .mo-unit-card {
     display: flex;
     align-items: center;
-    padding: 6px 12px;
-    gap: 8px;
+    padding: 8px 14px;
+    gap: 10px;
     border-bottom: 1px solid rgba(85, 134, 138, 0.1);
     transition: background 0.15s ease;
 }
@@ -564,6 +564,7 @@
     width: 36px;
     height: 36px;
     flex-shrink: 0;
+    margin-right: 2px;
 }
 
 .so-unit-icon {
@@ -590,7 +591,7 @@
 }
 
 .so-unit-name {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: #d4e4f0;
     white-space: nowrap;
@@ -600,10 +601,10 @@
 
 .so-unit-meta {
     display: flex;
-    gap: 8px;
-    font-size: 11px;
+    gap: 12px;
+    font-size: 12px;
     color: #8899aa;
-    margin-top: 2px;
+    margin-top: 3px;
 }
 
 .so-unit-cost {
@@ -618,9 +619,9 @@
 }
 
 .so-matchup {
-    padding: 2px 5px;
+    padding: 3px 6px;
     border-radius: 3px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     text-align: center;
     min-width: 36px;
@@ -672,7 +673,7 @@
    Score
    ============================================================ */
 .so-score {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     color: #a8d8ea;
     width: 32px;
@@ -684,8 +685,8 @@
    Footer
    ============================================================ */
 .so-footer {
-    padding: 4px 12px;
-    font-size: 10px;
+    padding: 6px 14px;
+    font-size: 11px;
     color: #556677;
     text-align: center;
     border-top: 1px solid rgba(85, 134, 138, 0.15);
@@ -743,8 +744,8 @@
    Scouting panel (teal/cyan accent — loading screen)
    ============================================================ */
 .sc-panel {
-    width: 420px;
-    max-height: 600px;
+    width: 440px;
+    max-height: 620px;
     top: 10px;
     left: 10px;
     border-color: rgba(0, 200, 200, 0.6);
@@ -765,7 +766,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: rgba(15, 50, 55, 0.85);
     border-bottom: 1px solid rgba(0, 200, 200, 0.3);
     cursor: move;
@@ -775,7 +776,7 @@
 }
 
 .sc-header-title {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: #70e8e8;
 }
@@ -786,8 +787,8 @@
     border-radius: 3px;
     color: #60bbbb;
     cursor: pointer;
-    padding: 2px 6px;
-    font-size: 11px;
+    padding: 3px 7px;
+    font-size: 12px;
     flex-shrink: 0;
 }
 
@@ -798,8 +799,8 @@
 
 /* --- Section dividers --- */
 .sc-section-label {
-    padding: 5px 12px 3px;
-    font-size: 10px;
+    padding: 7px 14px 4px;
+    font-size: 11px;
     font-weight: 700;
     color: #60bbbb;
     text-transform: uppercase;
@@ -810,7 +811,7 @@
 
 /* --- Player card --- */
 .sc-player-card {
-    padding: 6px 12px;
+    padding: 8px 14px;
     border-bottom: 1px solid rgba(0, 200, 200, 0.1);
 }
 
@@ -820,10 +821,10 @@
 
 .sc-player-name {
     display: block;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: #70e8e8;
-    margin-bottom: 2px;
+    margin-bottom: 3px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -841,9 +842,9 @@
 .sc-stats {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    margin-bottom: 3px;
+    gap: 10px;
+    font-size: 13px;
+    margin-bottom: 4px;
 }
 
 .sc-loading {
@@ -881,7 +882,7 @@
 }
 
 .sc-icons-label {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     color: #60bbbb;
     width: 24px;
@@ -903,14 +904,14 @@
 }
 
 .sc-icon-count {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     color: #aabbcc;
 }
 
 /* Scouting header subtitle (Last N Games) */
 .sc-header-subtitle {
-    font-size: 11px;
+    font-size: 12px;
     color: #60bbbb;
     font-weight: 400;
 }
@@ -1002,7 +1003,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: rgba(30, 50, 70, 0.8);
     border-bottom: 1px solid rgba(85, 134, 138, 0.4);
     cursor: move;
@@ -1020,8 +1021,8 @@
     border-radius: 3px;
     color: #8899aa;
     cursor: pointer;
-    padding: 2px 6px;
-    font-size: 11px;
+    padding: 3px 7px;
+    font-size: 12px;
 }
 
 .sg-toggle-btn:hover {
@@ -1103,6 +1104,31 @@
     background: none;
 }
 
+/* Reset layout button */
+.sg-reset-row {
+    padding: 12px 16px 4px;
+    text-align: center;
+    border-top: 1px solid rgba(85, 134, 138, 0.15);
+    margin-top: 4px;
+}
+
+.sg-reset-btn {
+    background: rgba(85, 134, 138, 0.15);
+    border: 1px solid rgba(85, 134, 138, 0.4);
+    border-radius: 4px;
+    color: #8899aa;
+    cursor: pointer;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-family: inherit;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sg-reset-btn:hover {
+    background: rgba(85, 134, 138, 0.3);
+    color: #a8d8ea;
+}
+
 /* Header buttons group (gear + minimize side by side) */
 .so-header-btns {
     display: flex;
@@ -1111,17 +1137,8 @@
     flex-shrink: 0;
 }
 
-/* Settings "..." dots button */
-.so-gear-btn {
-    padding: 2px 4px;
-    line-height: 1;
-}
-
+/* Settings "..." dots button — same size as minimize button */
 .so-dots-icon {
-    font-size: 14px;
     font-weight: 900;
     letter-spacing: 1px;
-    line-height: 0.5;
-    display: inline-block;
-    vertical-align: middle;
 }

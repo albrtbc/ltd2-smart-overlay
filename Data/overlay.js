@@ -1491,7 +1491,7 @@
         }
 
         var html = '<div class="sg-header">' +
-            '<span class="sg-header-title">Settings</span>' +
+            '<span class="sg-header-title">Smart Overlay Settings</span>' +
             '<button id="sg-close-btn" class="sg-toggle-btn" tabindex="-1">\u00d7</button>' +
             '</div>';
 
@@ -1505,6 +1505,10 @@
             'Show the 5-wave push/hold forecast inside the merc advisor panel.', true);
         html += renderToggleRow('showDefenseStrength', 'Defense Strength',
             'Show the STRONG/NEUTRAL/WEAK indicator for your army vs the current wave.', false);
+
+        html += '<div class="sg-reset-row">' +
+            '<button id="sg-reset-btn" class="sg-reset-btn" tabindex="-1">Reset Layout</button>' +
+            '</div>';
 
         root.innerHTML = html;
         bindSettingsEvents();
@@ -1544,6 +1548,32 @@
             closeBtn.onclick = function () {
                 state.settingsVisible = false;
                 renderSettings();
+            };
+        }
+
+        var resetBtn = document.getElementById('sg-reset-btn');
+        if (resetBtn) {
+            resetBtn.onclick = function () {
+                // Clear saved positions
+                try {
+                    localStorage.removeItem(STORAGE_KEY_FIGHTER);
+                    localStorage.removeItem(STORAGE_KEY_MERC);
+                    localStorage.removeItem(STORAGE_KEY_SCOUT);
+                } catch (e) { /* ignore */ }
+                // Reset panels to CSS defaults
+                var panels = [
+                    { id: FIGHTER_ID, cls: 'so-panel' },
+                    { id: MERC_ID, cls: 'mo-panel' },
+                    { id: SCOUT_ID, cls: 'sc-panel' }
+                ];
+                for (var p = 0; p < panels.length; p++) {
+                    var el = document.getElementById(panels[p].id);
+                    if (el) {
+                        el.style.left = '';
+                        el.style.top = '';
+                        el.style.right = '';
+                    }
+                }
             };
         }
 
