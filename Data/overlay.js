@@ -51,7 +51,8 @@
         myDefenseValue: {},
         // Scouting panel
         scoutingPlayers: {},   // {key: {name, isAlly, data, loading, error}}
-        scoutingVisible: false
+        scoutingVisible: false,
+        isBotGame: false
     };
 
     var renderTimer = null;
@@ -248,8 +249,37 @@
     //  Scouting — extract player names from scoreboard
     // =========================================================================
 
+    function isBotName(name) {
+        if (!name) return false;
+        var plain = name.replace(/<[^>]+>/g, '').trim().toLowerCase();
+        return /\bbot\b/.test(plain);
+    }
+
     function captureScoutingFromScoreboard(players) {
         if (!players || !players.length) return;
+
+        // Detect bot game: check if all opponents are bots
+        if (!state.isBotGame) {
+            var allBots = true;
+            var hasOpponent = false;
+            for (var b = 0; b < players.length; b++) {
+                if (players[b].defenderPlayerName) {
+                    hasOpponent = true;
+                    if (!isBotName(players[b].defenderPlayerName)) {
+                        allBots = false;
+                        break;
+                    }
+                }
+            }
+            if (hasOpponent && allBots) {
+                state.isBotGame = true;
+                state.scoutingVisible = false;
+                console.log('[SmartOverlay] Bot game detected — scouting disabled.');
+                return;
+            }
+        } else {
+            return;
+        }
 
         // Collect already-known names
         var seen = {};
@@ -419,6 +449,12 @@
 
         // --- Fighter events ---
         engine.on('refreshWaveNumber', function (waveNumber) {
+            // New game started — reset bot detection and scouting
+            if (waveNumber === 1 && state.waveNum !== 1) {
+                state.isBotGame = false;
+                state.scoutingPlayers = {};
+                state.scoutingVisible = false;
+            }
             state.waveNum = waveNumber;
             state.inGame = true;
             scheduleRender();
@@ -1027,8 +1063,8 @@
 
         root.className = 'sc-panel';
 
-        // Show only when visible (user hasn't closed it) and we have data
-        if (!state.scoutingVisible) {
+        // Hide in bot games or when user closed the panel
+        if (state.isBotGame || !state.scoutingVisible) {
             addClass(root, 'so-hidden');
             root.innerHTML = '';
             return;
