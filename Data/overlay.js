@@ -52,7 +52,10 @@
         // Scouting panel
         scoutingPlayers: {},   // {key: {name, isAlly, data, loading, error}}
         scoutingVisible: false,
-        isBotGame: false
+        isBotGame: false,
+        // Extra HUD bars (worker, king upgrades)
+        gloveboxActions: null,
+        leftboxActions: null
     };
 
     var renderTimer = null;
@@ -252,7 +255,7 @@
     function isBotName(name) {
         if (!name) return false;
         var plain = name.replace(/<[^>]+>/g, '').trim().toLowerCase();
-        return /\bbot\b/.test(plain);
+        return /\b(bot|ai)\b/.test(plain);
     }
 
     function captureScoutingFromScoreboard(players) {
@@ -438,13 +441,21 @@
     }
 
     // =========================================================================
-    //  Hotkey badges on the game's unit bar
+    //  Hotkey badges on the game's unit / merc / king bars
     // =========================================================================
+
+    var SHORTCUT_DISPLAY = {
+        'COMMA': ',', 'PERIOD': '.', 'SLASH': '/',
+        'SEMICOLON': ';', 'QUOTE': "'", 'MINUS': '-', 'EQUALS': '=',
+        'BACKQUOTE': '`', 'SPACE': 'Spc'
+    };
 
     function extractShortcut(header) {
         if (!header) return '';
-        var match = header.match(/\[([A-Z0-9])\]/i);
-        return match ? match[1].toUpperCase() : '';
+        var match = header.match(/\[([A-Za-z0-9_]+)\]/);
+        if (!match) return '';
+        var raw = match[1].toUpperCase();
+        return SHORTCUT_DISPLAY[raw] || raw;
     }
 
     function iconBaseName(path) {
@@ -452,52 +463,133 @@
         return path.replace(/\\/g, '/').split('/').pop().replace(/\.png$/i, '').toLowerCase();
     }
 
-    var hotkeyBadges = [];
+    function isSmallBadgeAction(header) {
+        if (!header) return false;
+        var lower = header.toLowerCase();
+        return /upgrade|king|train\s*worker/.test(lower);
+    }
 
-    function injectHotkeyLabels() {
-        // Remove previous badges
-        for (var r = 0; r < hotkeyBadges.length; r++) {
-            if (hotkeyBadges[r].parentNode) {
-                hotkeyBadges[r].parentNode.removeChild(hotkeyBadges[r]);
+    // Master map persists for the entire game — never rebuilt, only merged into.
+    // { iconName: { label, small } }
+    var masterShortcutMap = {};
+    var hotkeyTimer = null;
+    var hotkeyRetryTimer = null;
+
+    function scheduleHotkeyInject() {
+        if (hotkeyTimer) clearTimeout(hotkeyTimer);
+        if (hotkeyRetryTimer) clearTimeout(hotkeyRetryTimer);
+        hotkeyTimer = setTimeout(function () {
+            hotkeyTimer = null;
+            mergeActionsIntoMaster();
+            applyHotkeyBadges();
+            // Second pass: game may render icons after a delay
+            hotkeyRetryTimer = setTimeout(function () {
+                hotkeyRetryTimer = null;
+                applyHotkeyBadges();
+            }, 400);
+        }, 80);
+    }
+
+    function resetHotkeyBadges() {
+        masterShortcutMap = {};
+        actionContainersLogged = false;
+        // Remove any live badges from DOM
+        var old = document.getElementsByClassName('so-hotkey-badge');
+        while (old.length > 0) {
+            old[0].parentNode.removeChild(old[0]);
+        }
+    }
+
+    function mergeActionsIntoMaster() {
+        var sources = [
+            { actions: state.dashboardActions, forceSmall: false },
+            { actions: state.windshieldActions, forceSmall: true },
+            { actions: state.gloveboxActions,   forceSmall: true },
+            { actions: state.leftboxActions,    forceSmall: true }
+        ];
+        for (var s = 0; s < sources.length; s++) {
+            var acts = sources[s].actions;
+            if (!acts) continue;
+            for (var i = 0; i < acts.length; i++) {
+                var a = acts[i];
+                var key = iconBaseName(a.image);
+                var sc = extractShortcut(a.header);
+                if (!key || !sc) continue;
+                if (masterShortcutMap[key]) continue; // already known
+                var small = sources[s].forceSmall || isSmallBadgeAction(a.header);
+                masterShortcutMap[key] = { label: sc, small: small };
             }
         }
-        hotkeyBadges = [];
+    }
 
-        if (!state.dashboardActions || !state.dashboardActions.length) return;
+    var actionContainersLogged = false;
 
-        // Build icon name -> shortcut map
-        var map = {};
-        for (var i = 0; i < state.dashboardActions.length; i++) {
-            var a = state.dashboardActions[i];
-            var key = iconBaseName(a.image);
-            var sc = extractShortcut(a.header);
-            if (key && sc) map[key] = sc;
+    function getActionContainers() {
+        var names = ['dashboard', 'windshield', 'glovebox', 'leftbox'];
+        var found = [];
+        for (var i = 0; i < names.length; i++) {
+            var el = document.getElementById(names[i]);
+            if (el) { found.push(el); continue; }
+            var byClass = document.getElementsByClassName(names[i]);
+            for (var k = 0; k < byClass.length; k++) {
+                found.push(byClass[k]);
+            }
+        }
+        if (!actionContainersLogged && found.length > 0) {
+            actionContainersLogged = true;
+            console.log('[SmartOverlay] Found ' + found.length + ' action containers for hotkey badges.');
+        }
+        return found;
+    }
+
+    function applyHotkeyBadges() {
+        if (!Object.keys(masterShortcutMap).length) return;
+
+        var containers = getActionContainers();
+        var searchRoots = containers.length > 0 ? containers : null;
+
+        // If no known containers, skip — avoids polluting informational panels
+        if (!searchRoots) {
+            if (!actionContainersLogged) {
+                actionContainersLogged = true;
+                console.log('[SmartOverlay] No action containers found — hotkey badges disabled.');
+            }
+            return;
         }
 
-        // Find game UI images (skip our overlay panels)
-        var imgs = document.getElementsByTagName('img');
-        for (var j = 0; j < imgs.length; j++) {
-            var img = imgs[j];
-            if (findAncestorWithClass(img, 'so-panel') ||
-                findAncestorWithClass(img, 'mo-panel') ||
-                findAncestorWithClass(img, 'sc-panel')) continue;
+        for (var ri = 0; ri < searchRoots.length; ri++) {
+            var imgs = searchRoots[ri].getElementsByTagName('img');
+            for (var j = 0; j < imgs.length; j++) {
+                var img = imgs[j];
+                var name = iconBaseName(img.getAttribute('src'));
+                if (!name || !masterShortcutMap[name]) continue;
 
-            var name = iconBaseName(img.getAttribute('src'));
-            if (name && map[name]) {
-                var badge = document.createElement('span');
-                badge.className = 'so-hotkey-badge';
-                badge.textContent = map[name];
-
+                // Check if this img already has a badge sibling
                 var parent = img.parentNode;
-                if (parent) {
-                    var pos = (parent.style && parent.style.position) || '';
-                    if (!pos || pos === 'static') {
-                        parent.style.position = 'relative';
+                if (!parent) continue;
+                var hasBadge = false;
+                var children = parent.childNodes;
+                for (var c = 0; c < children.length; c++) {
+                    if (children[c].className &&
+                        (' ' + children[c].className + ' ').indexOf(' so-hotkey-badge ') !== -1) {
+                        hasBadge = true;
+                        break;
                     }
-                    parent.appendChild(badge);
-                    hotkeyBadges.push(badge);
                 }
-                delete map[name]; // one badge per icon
+                if (hasBadge) continue;
+
+                var info = masterShortcutMap[name];
+                var badge = document.createElement('span');
+                badge.className = info.small
+                    ? 'so-hotkey-badge so-hotkey-sm'
+                    : 'so-hotkey-badge';
+                badge.textContent = info.label;
+
+                var pos = (parent.style && parent.style.position) || '';
+                if (!pos || pos === 'static') {
+                    parent.style.position = 'relative';
+                }
+                parent.appendChild(badge);
             }
         }
     }
@@ -519,6 +611,7 @@
                 state.isBotGame = false;
                 state.scoutingPlayers = {};
                 state.scoutingVisible = false;
+                resetHotkeyBadges();
             }
             state.waveNum = waveNumber;
             state.inGame = true;
@@ -560,17 +653,25 @@
             state.dashboardActions = actions;
             state.inGame = true;
             scheduleRender();
-            // Inject hotkey badges on the game's unit bar after it renders
-            setTimeout(injectHotkeyLabels, 150);
+            scheduleHotkeyInject();
         });
 
         // --- Mercenary events ---
         engine.on('refreshWindshieldActions', function (actions) {
             state.windshieldActions = actions;
             state.inGame = true;
-
-
             scheduleRender();
+            scheduleHotkeyInject();
+        });
+
+        // --- Glovebox & Leftbox (worker, king upgrades) ---
+        engine.on('refreshGloveboxActions', function (actions) {
+            state.gloveboxActions = actions;
+            scheduleHotkeyInject();
+        });
+        engine.on('refreshLeftboxActions', function (actions) {
+            state.leftboxActions = actions;
+            scheduleHotkeyInject();
         });
 
         engine.on('refreshWindshieldDefender', function (defenderName) {
