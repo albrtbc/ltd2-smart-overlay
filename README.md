@@ -9,6 +9,7 @@ A BepInEx plugin for **Legion TD 2** that provides real-time in-game overlays wi
 - **Mercenary Advisor** — Scores mercs against the opponent's fighter composition (armor/attack breakdown) with click-to-buy
 - **PUSH/HOLD Forecast** — 5-wave forecast showing whether each wave's type matchup favors sending mercs or saving mythium
 - **Scouting Panel** — Fetches win/loss, Elo, top masterminds, and wave 1 openers for all players via the Drachbot API
+- **Settings Panel** — Toggle individual features on/off (Scouting, Hotkey Badges, Merc Adviser, Push/Hold Forecast, Defense Strength); settings persist across sessions
 - **Draggable panels** — All panels can be repositioned and minimized; positions persist across games
 
 ## Requirements
@@ -82,6 +83,7 @@ Once installed, the overlays appear automatically when you enter a match:
 | **Merc Advisor** | Press **Tab + Space** to scan enemy | Shows opponent's armor/attack breakdown and best mercs to send |
 | **PUSH/HOLD** | After scanning enemy (Tab + Space) | 5-wave forecast for merc sending decisions |
 | **Scouting** | Press **Tab** to open scoreboard | Auto-fetches player stats from Drachbot API |
+| **Settings** | **SOS** button (main menu) or **...** button (in-game) | Toggle overlay features on/off |
 
 ### Controls
 
@@ -89,6 +91,7 @@ Once installed, the overlays appear automatically when you enter a match:
 - **Minimize** panels with the `–` button in the header
 - **Close** scouting panel with the `×` button
 - **Click** a merc card to purchase it directly
+- **Settings** — Open from the **SOS** button on the main menu, or the **...** button on the fighter panel header during a match. Each feature can be individually toggled. Settings persist across sessions via localStorage
 
 ## How it works
 

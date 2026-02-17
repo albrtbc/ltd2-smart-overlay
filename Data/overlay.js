@@ -812,11 +812,11 @@
         settingsRoot.className = 'sg-panel so-hidden';
         document.body.appendChild(settingsRoot);
 
-        // Main menu settings link
-        var mmLink = document.createElement('div');
-        mmLink.id = MAINMENU_ID;
-        mmLink.className = 'so-mm-link';
-        document.body.appendChild(mmLink);
+        // Main menu settings button
+        var mmBtn = document.createElement('div');
+        mmBtn.id = MAINMENU_ID;
+        mmBtn.className = 'so-mm-btn so-hidden';
+        document.body.appendChild(mmBtn);
 
         bindGameEvents();
         initDrag();
@@ -1458,15 +1458,15 @@
         var root = document.getElementById(MAINMENU_ID);
         if (!root) return;
 
-        // Show only when NOT in-game (main menu / lobby)
+        // Hide when in a match (fighter panel active)
         var inGame = state.inGame && state.dashboardActions && state.dashboardActions.length > 0;
         if (inGame) {
-            root.className = 'so-mm-link so-hidden';
+            root.className = 'so-mm-btn so-hidden';
             return;
         }
 
-        root.className = 'so-mm-link';
-        root.innerHTML = '<span class="so-mm-text">| Smart Overlay Settings</span>';
+        root.className = 'so-mm-btn';
+        root.innerHTML = 'SOS';
 
         root.onclick = function () {
             state.settingsVisible = !state.settingsVisible;
@@ -1495,17 +1495,22 @@
             '<button id="sg-close-btn" class="sg-toggle-btn" tabindex="-1">\u00d7</button>' +
             '</div>';
 
-        html += renderToggleRow('showScouting', 'Scouting', false);
-        html += renderToggleRow('showHotkeyBadges', 'Hotkey Badges', false);
-        html += renderToggleRow('showMercAdviser', 'Merc Adviser', false);
-        html += renderToggleRow('showPushForecast', 'Push/Hold Forecast', true);
-        html += renderToggleRow('showDefenseStrength', 'Defense Strength', false);
+        html += renderToggleRow('showScouting', 'Scouting',
+            'Fetch player stats (W/L, Elo, openers) from Drachbot API when the scoreboard opens.', false);
+        html += renderToggleRow('showHotkeyBadges', 'Hotkey Badges',
+            'Show keyboard shortcut labels on the game\'s unit, merc, and king action bars.', false);
+        html += renderToggleRow('showMercAdviser', 'Merc Adviser',
+            'Show the merc advisor panel with opponent breakdown and merc recommendations.', false);
+        html += renderToggleRow('showPushForecast', 'Push/Hold Forecast',
+            'Show the 5-wave push/hold forecast inside the merc advisor panel.', true);
+        html += renderToggleRow('showDefenseStrength', 'Defense Strength',
+            'Show the STRONG/NEUTRAL/WEAK indicator for your army vs the current wave.', false);
 
         root.innerHTML = html;
         bindSettingsEvents();
     }
 
-    function renderToggleRow(key, label, isSub) {
+    function renderToggleRow(key, label, desc, isSub) {
         var active = state[key];
         var disabled = false;
 
@@ -1522,7 +1527,10 @@
         var indicatorCls = 'sg-indicator' + (active ? ' sg-toggle-active' : '');
 
         return '<div class="' + rowCls + '" data-setting="' + escapeAttr(key) + '">' +
-            '<span class="sg-label">' + escapeHtml(label) + '</span>' +
+            '<div class="sg-toggle-content">' +
+                '<span class="sg-label">' + escapeHtml(label) + '</span>' +
+                '<span class="sg-desc">' + escapeHtml(desc) + '</span>' +
+            '</div>' +
             '<span class="' + indicatorCls + '">' + (active ? 'ON' : 'OFF') + '</span>' +
             '</div>';
     }
