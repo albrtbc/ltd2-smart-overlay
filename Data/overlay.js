@@ -68,12 +68,15 @@
         showMercAdviser: true,
         showPushForecast: true,
         showDefenseStrength: true,
+        showTopPicks: true,
+        topFighterIcons: [],     // [{name, rank}] top-3 recommendation icons
         // Update notification
         updateAvailable: null,   // {version, url} when a newer release exists
         updateDismissed: false
     };
 
     var renderTimer = null;
+    var topPickRetryTimer = null;
 
     // --- Scoreboard view detection ---
     var scoreboardOpen = false;
@@ -139,6 +142,12 @@
             renderMerc();
             renderScouting();
             renderMainMenuLink();
+            // Retry highlight: game may re-render dashboard icons after a delay
+            if (topPickRetryTimer) clearTimeout(topPickRetryTimer);
+            topPickRetryTimer = setTimeout(function () {
+                topPickRetryTimer = null;
+                applyTopPickHighlight();
+            }, 500);
         }, RENDER_DEBOUNCE_MS);
     }
 
@@ -469,7 +478,7 @@
     // =========================================================================
 
     var SETTINGS_KEYS = ['showScouting', 'showHotkeyBadges', 'showMercAdviser',
-                         'showPushForecast', 'showDefenseStrength'];
+                         'showPushForecast', 'showDefenseStrength', 'showTopPicks'];
 
     function loadSettings() {
         try {
@@ -592,10 +601,12 @@
             hotkeyTimer = null;
             mergeActionsIntoMaster();
             applyHotkeyBadges();
+            applyTopPickHighlight();
             // Second pass: game may render icons after a delay
             hotkeyRetryTimer = setTimeout(function () {
                 hotkeyRetryTimer = null;
                 applyHotkeyBadges();
+                applyTopPickHighlight();
             }, 400);
         }, 80);
     }
@@ -608,6 +619,8 @@
         while (old.length > 0) {
             old[0].parentNode.removeChild(old[0]);
         }
+        clearTopPickHighlights();
+        state.topFighterIcons = [];
     }
 
     function mergeActionsIntoMaster() {
@@ -708,6 +721,84 @@
                     parent.style.position = 'relative';
                 }
                 parent.appendChild(badge);
+            }
+        }
+    }
+
+    function clearTopPickHighlights() {
+        var old = document.getElementsByClassName('so-top-pick');
+        while (old.length > 0) {
+            old[0].parentNode.removeChild(old[0]);
+        }
+        // Remove badge color classes
+        var goldBadges = document.getElementsByClassName('so-hotkey-gold');
+        while (goldBadges.length > 0) {
+            removeClass(goldBadges[0], 'so-hotkey-gold');
+        }
+        var greenBadges = document.getElementsByClassName('so-hotkey-green');
+        while (greenBadges.length > 0) {
+            removeClass(greenBadges[0], 'so-hotkey-green');
+        }
+    }
+
+    function applyTopPickHighlight() {
+        clearTopPickHighlights();
+
+        if (!state.topFighterIcons.length) return;
+
+        var containers = getActionContainers();
+        if (!containers.length) return;
+
+        // Build lookup: iconName → CSS class
+        var lookup = {};
+        for (var t = 0; t < state.topFighterIcons.length; t++) {
+            var entry = state.topFighterIcons[t];
+            lookup[entry.name] = entry.rank === 1
+                ? 'so-top-pick so-top-pick-gold'
+                : 'so-top-pick so-top-pick-green';
+        }
+
+        for (var ri = 0; ri < containers.length; ri++) {
+            var imgs = containers[ri].getElementsByTagName('img');
+            for (var i = 0; i < imgs.length; i++) {
+                var name = iconBaseName(imgs[i].getAttribute('src'));
+                if (!name || !lookup[name]) continue;
+
+                var parent = imgs[i].parentNode;
+                if (!parent) continue;
+
+                // Skip if already has a highlight overlay
+                var hasOverlay = false;
+                var children = parent.childNodes;
+                for (var c = 0; c < children.length; c++) {
+                    if (children[c].className &&
+                        (' ' + children[c].className + ' ').indexOf(' so-top-pick ') !== -1) {
+                        hasOverlay = true;
+                        break;
+                    }
+                }
+                if (hasOverlay) continue;
+
+                var pos = (parent.style && parent.style.position) || '';
+                if (!pos || pos === 'static') {
+                    parent.style.position = 'relative';
+                }
+
+                var overlay = document.createElement('span');
+                overlay.className = lookup[name];
+                parent.appendChild(overlay);
+
+                // Color the hotkey badge too
+                var badgeCls = lookup[name].indexOf('gold') !== -1
+                    ? 'so-hotkey-gold' : 'so-hotkey-green';
+                var children2 = parent.childNodes;
+                for (var b = 0; b < children2.length; b++) {
+                    if (children2[b].className &&
+                        (' ' + children2[b].className + ' ').indexOf(' so-hotkey-badge ') !== -1) {
+                        addClass(children2[b], badgeCls);
+                        break;
+                    }
+                }
             }
         }
     }
@@ -959,6 +1050,38 @@
                 };
             }
         }
+
+        // Track top-3 icons for dashboard highlight
+        // Suppress when disabled or a unit is selected (Sell action visible)
+        state.topFighterIcons = [];
+        var hasSell = !state.showTopPicks;
+        for (var si = 0; si < state.dashboardActions.length; si++) {
+            var h = state.dashboardActions[si].header;
+            if (h && h.toLowerCase().indexOf('sell') !== -1) {
+                hasSell = true;
+                break;
+            }
+        }
+        if (!hasSell) {
+            // Match recommendations to dashboard actions via shortcut key,
+            // so we use the same icon name that the game's DOM uses.
+            var recs = result.recommendations || [];
+            for (var ti = 0; ti < Math.min(3, recs.length); ti++) {
+                var rec = recs[ti];
+                if (!rec || !rec.shortcut) continue;
+                for (var ai = 0; ai < state.dashboardActions.length; ai++) {
+                    var act = state.dashboardActions[ai];
+                    if (extractShortcut(act.header) === rec.shortcut) {
+                        state.topFighterIcons.push({
+                            name: iconBaseName(act.image),
+                            rank: ti + 1
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+        applyTopPickHighlight();
 
         root.innerHTML = renderFighterHeader() +
             renderWaveInfo(result.wave) +
@@ -1607,6 +1730,8 @@
             'Show the 5-wave push/hold forecast inside the merc advisor panel.', true);
         html += renderToggleRow('showDefenseStrength', 'Defense Strength',
             'Show the STRONG/NEUTRAL/WEAK indicator for your army vs the current wave.', false);
+        html += renderToggleRow('showTopPicks', 'Top Picks Highlight',
+            'Highlight the top 3 recommended units on the game\'s purchase bar with glowing borders.', false);
 
         html += '<div class="sg-reset-row">' +
             '<button id="sg-reset-btn" class="sg-reset-btn" tabindex="-1">Reset Layout</button>' +
@@ -1702,6 +1827,10 @@
                     }
                     if (key === 'showMercAdviser' && !state.showMercAdviser) {
                         state.showPushForecast = false;
+                    }
+                    if (key === 'showTopPicks' && !state.showTopPicks) {
+                        state.topFighterIcons = [];
+                        clearTopPickHighlights();
                     }
 
                     saveSettings();

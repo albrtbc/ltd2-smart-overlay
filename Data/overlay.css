@@ -916,6 +916,40 @@
     font-weight: 400;
 }
 
+/* Top recommendation highlight overlays on the game's dashboard icons */
+.so-top-pick {
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 5px;
+    pointer-events: none;
+    z-index: 9998;
+}
+
+.so-top-pick-gold {
+    border: 3px solid #ffd050;
+    box-shadow: 0 0 10px #ffd050, 0 0 20px rgba(255, 208, 80, 0.5);
+    animation: so-glow-gold 1.8s ease-in-out infinite;
+}
+
+.so-top-pick-green {
+    border: 3px solid #50e060;
+    box-shadow: 0 0 8px #50e060, 0 0 16px rgba(80, 224, 96, 0.4);
+    animation: so-glow-green 2s ease-in-out infinite;
+}
+
+@keyframes so-glow-gold {
+    0%, 100% { box-shadow: 0 0 10px #ffd050, 0 0 20px rgba(255, 208, 80, 0.5); }
+    50% { box-shadow: 0 0 16px #ffe080, 0 0 30px rgba(255, 224, 128, 0.7); }
+}
+
+@keyframes so-glow-green {
+    0%, 100% { box-shadow: 0 0 8px #50e060, 0 0 16px rgba(80, 224, 96, 0.4); }
+    50% { box-shadow: 0 0 12px #70ff80, 0 0 24px rgba(112, 255, 128, 0.5); }
+}
+
 /* Hotkey badges injected on the game's unit / merc / king bars */
 .so-hotkey-badge {
     position: absolute;
@@ -944,6 +978,24 @@
     font-size: 11px;
     min-width: 16px;
     padding: 2px 3px;
+}
+
+/* Top-1 gold badge */
+.so-hotkey-badge.so-hotkey-gold {
+    color: #fff8e0;
+    background: rgba(200, 160, 40, 0.5);
+    border-color: #ffd050;
+    box-shadow: 0 0 8px #ffd050, 0 0 16px rgba(255, 208, 80, 0.4);
+    animation: so-glow-gold 1.8s ease-in-out infinite;
+}
+
+/* Top-2/3 green badge */
+.so-hotkey-badge.so-hotkey-green {
+    color: #e0ffe0;
+    background: rgba(40, 160, 50, 0.5);
+    border-color: #50e060;
+    box-shadow: 0 0 6px #50e060, 0 0 12px rgba(80, 224, 96, 0.35);
+    animation: so-glow-green 2s ease-in-out infinite;
 }
 
 /* ============================================================
