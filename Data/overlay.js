@@ -438,6 +438,71 @@
     }
 
     // =========================================================================
+    //  Hotkey badges on the game's unit bar
+    // =========================================================================
+
+    function extractShortcut(header) {
+        if (!header) return '';
+        var match = header.match(/\[([A-Z0-9])\]/i);
+        return match ? match[1].toUpperCase() : '';
+    }
+
+    function iconBaseName(path) {
+        if (!path) return '';
+        return path.replace(/\\/g, '/').split('/').pop().replace(/\.png$/i, '').toLowerCase();
+    }
+
+    var hotkeyBadges = [];
+
+    function injectHotkeyLabels() {
+        // Remove previous badges
+        for (var r = 0; r < hotkeyBadges.length; r++) {
+            if (hotkeyBadges[r].parentNode) {
+                hotkeyBadges[r].parentNode.removeChild(hotkeyBadges[r]);
+            }
+        }
+        hotkeyBadges = [];
+
+        if (!state.dashboardActions || !state.dashboardActions.length) return;
+
+        // Build icon name -> shortcut map
+        var map = {};
+        for (var i = 0; i < state.dashboardActions.length; i++) {
+            var a = state.dashboardActions[i];
+            var key = iconBaseName(a.image);
+            var sc = extractShortcut(a.header);
+            if (key && sc) map[key] = sc;
+        }
+
+        // Find game UI images (skip our overlay panels)
+        var imgs = document.getElementsByTagName('img');
+        for (var j = 0; j < imgs.length; j++) {
+            var img = imgs[j];
+            if (findAncestorWithClass(img, 'so-panel') ||
+                findAncestorWithClass(img, 'mo-panel') ||
+                findAncestorWithClass(img, 'sc-panel')) continue;
+
+            var name = iconBaseName(img.getAttribute('src'));
+            if (name && map[name]) {
+                var badge = document.createElement('span');
+                badge.className = 'so-hotkey-badge';
+                badge.textContent = map[name];
+
+                var parent = img.parentNode;
+                if (parent) {
+                    var pos = (parent.style && parent.style.position) || '';
+                    if (!pos || pos === 'static') {
+                        parent.style.position = 'relative';
+                    }
+                    parent.appendChild(badge);
+                    hotkeyBadges.push(badge);
+                }
+                delete map[name]; // one badge per icon
+            }
+        }
+    }
+
+    // =========================================================================
     //  Engine event bindings
     // =========================================================================
 
@@ -495,6 +560,8 @@
             state.dashboardActions = actions;
             state.inGame = true;
             scheduleRender();
+            // Inject hotkey badges on the game's unit bar after it renders
+            setTimeout(injectHotkeyLabels, 150);
         });
 
         // --- Mercenary events ---
