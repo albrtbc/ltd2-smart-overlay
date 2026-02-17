@@ -362,7 +362,7 @@
 
     function fetchScoutingData(playerName, playerNum) {
         var xhr = new XMLHttpRequest();
-        xhr.open('GET', SCOUT_API + encodeURIComponent(playerName), true);
+        xhr.open('GET', SCOUT_API + encodeURIComponent(playerName) + '?_=' + Date.now(), true);
         xhr.timeout = 8000;
         xhr.onload = function () {
             if (xhr.status === 200) {
@@ -419,7 +419,7 @@
         } catch (e) { /* ignore */ }
 
         var xhr = new XMLHttpRequest();
-        xhr.open('GET', GITHUB_API_LATEST, true);
+        xhr.open('GET', GITHUB_API_LATEST + '?_=' + Date.now(), true);
         xhr.timeout = 10000;
         xhr.onload = function () {
             if (xhr.status !== 200) return;
