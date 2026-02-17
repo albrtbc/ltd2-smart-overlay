@@ -18,6 +18,9 @@
     var STORAGE_KEY_FIGHTER = 'smartOverlayPosition';
     var STORAGE_KEY_MERC = 'mercOverlayPosition';
     var STORAGE_KEY_SCOUT = 'scoutOverlayPosition';
+    var STORAGE_KEY_SETTINGS = 'smartOverlaySettings';
+    var SETTINGS_ID = 'settings-overlay-root';
+    var MAINMENU_ID = 'so-mainmenu-link';
     var SCOUT_API = 'https://stats.drachbot.site/api/drachbot_overlay/';
     var RENDER_DEBOUNCE_MS = 100;
 
@@ -55,7 +58,14 @@
         isBotGame: false,
         // Extra HUD bars (worker, king upgrades)
         gloveboxActions: null,
-        leftboxActions: null
+        leftboxActions: null,
+        // Settings panel
+        settingsVisible: false,
+        showScouting: true,
+        showHotkeyBadges: true,
+        showMercAdviser: true,
+        showPushForecast: true,
+        showDefenseStrength: true
     };
 
     var renderTimer = null;
@@ -123,6 +133,7 @@
             renderFighter();
             renderMerc();
             renderScouting();
+            renderMainMenuLink();
         }, RENDER_DEBOUNCE_MS);
     }
 
@@ -260,6 +271,7 @@
 
     function captureScoutingFromScoreboard(players) {
         if (!players || !players.length) return;
+        if (!state.showScouting) return;
 
         // Detect bot game: check if all opponents are bots
         if (!state.isBotGame) {
@@ -391,6 +403,38 @@
     }
 
     // =========================================================================
+    //  Settings persistence
+    // =========================================================================
+
+    var SETTINGS_KEYS = ['showScouting', 'showHotkeyBadges', 'showMercAdviser',
+                         'showPushForecast', 'showDefenseStrength'];
+
+    function loadSettings() {
+        try {
+            var saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
+            if (saved) {
+                var obj = JSON.parse(saved);
+                for (var i = 0; i < SETTINGS_KEYS.length; i++) {
+                    var k = SETTINGS_KEYS[i];
+                    if (obj.hasOwnProperty(k)) {
+                        state[k] = !!obj[k];
+                    }
+                }
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    function saveSettings() {
+        try {
+            var obj = {};
+            for (var i = 0; i < SETTINGS_KEYS.length; i++) {
+                obj[SETTINGS_KEYS[i]] = state[SETTINGS_KEYS[i]];
+            }
+            localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(obj));
+        } catch (e) { /* ignore */ }
+    }
+
+    // =========================================================================
     //  Drag system (shared for both panels)
     // =========================================================================
 
@@ -398,16 +442,19 @@
         document.addEventListener('mousedown', function (e) {
             var header = findAncestorWithClass(e.target, 'so-header') ||
                          findAncestorWithClass(e.target, 'mo-header') ||
-                         findAncestorWithClass(e.target, 'sc-header');
+                         findAncestorWithClass(e.target, 'sc-header') ||
+                         findAncestorWithClass(e.target, 'sg-header');
             if (!header) return;
             if (findAncestorWithClass(e.target, 'so-toggle-btn') ||
                 findAncestorWithClass(e.target, 'mo-toggle-btn') ||
-                findAncestorWithClass(e.target, 'sc-toggle-btn')) return;
+                findAncestorWithClass(e.target, 'sc-toggle-btn') ||
+                findAncestorWithClass(e.target, 'sg-toggle-btn')) return;
 
             // Determine which panel owns this header
             var panel = findAncestorWithClass(e.target, 'so-panel') ||
                         findAncestorWithClass(e.target, 'mo-panel') ||
-                        findAncestorWithClass(e.target, 'sc-panel');
+                        findAncestorWithClass(e.target, 'sc-panel') ||
+                        findAncestorWithClass(e.target, 'sg-panel');
             if (!panel) return;
 
             dragTarget = panel;
@@ -431,11 +478,12 @@
         document.addEventListener('mouseup', function () {
             if (!dragTarget) return;
             removeClass(dragTarget, 'so-dragging');
-            // Save position based on panel id
+            // Save position based on panel id (settings panel doesn't persist position)
             var key = dragTarget.id === MERC_ID ? STORAGE_KEY_MERC
                     : dragTarget.id === SCOUT_ID ? STORAGE_KEY_SCOUT
+                    : dragTarget.id === SETTINGS_ID ? null
                     : STORAGE_KEY_FIGHTER;
-            savePosition(dragTarget, key);
+            if (key) savePosition(dragTarget, key);
             dragTarget = null;
         });
     }
@@ -543,6 +591,7 @@
     }
 
     function applyHotkeyBadges() {
+        if (!state.showHotkeyBadges) return;
         if (!Object.keys(masterShortcutMap).length) return;
 
         var containers = getActionContainers();
@@ -733,6 +782,9 @@
     function init() {
         if (document.getElementById(FIGHTER_ID)) return;
 
+        // Load saved settings before anything else
+        loadSettings();
+
         // Fighter panel
         var fighterRoot = document.createElement('div');
         fighterRoot.id = FIGHTER_ID;
@@ -754,13 +806,26 @@
         document.body.appendChild(scoutRoot);
         restorePosition(scoutRoot, STORAGE_KEY_SCOUT);
 
+        // Settings panel
+        var settingsRoot = document.createElement('div');
+        settingsRoot.id = SETTINGS_ID;
+        settingsRoot.className = 'sg-panel so-hidden';
+        document.body.appendChild(settingsRoot);
+
+        // Main menu settings link
+        var mmLink = document.createElement('div');
+        mmLink.id = MAINMENU_ID;
+        mmLink.className = 'so-mm-link';
+        document.body.appendChild(mmLink);
+
         bindGameEvents();
         initDrag();
         renderFighter();
         renderMerc();
         renderScouting();
+        renderMainMenuLink();
 
-        console.log('[SmartOverlay] Initialized (fighter + merc + scouting panels).');
+        console.log('[SmartOverlay] Initialized (fighter + merc + scouting + settings panels).');
     }
 
     // =========================================================================
@@ -795,7 +860,7 @@
 
         // Defense strength: current board types + value vs recommended
         var defStrength = null;
-        if (eng.evaluateDefenseStrength && state.myGrid) {
+        if (state.showDefenseStrength && eng.evaluateDefenseStrength && state.myGrid) {
 
             var typeResult = eng.evaluateDefenseStrength(
                 state.waveNum, state.myDefenseValue, state.myAttackValue
@@ -842,6 +907,13 @@
                 renderFighter();
             };
         }
+        var gear = document.getElementById('so-settings-btn');
+        if (gear) {
+            gear.onclick = function () {
+                state.settingsVisible = !state.settingsVisible;
+                renderSettings();
+            };
+        }
     }
 
     function renderFighterHeader() {
@@ -851,7 +923,11 @@
         return '<div class="so-header">' +
             '<span class="so-header-title">Smart Overlay</span>' +
             '<span class="so-header-wave">' + escapeHtml(waveText) + escapeHtml(goldText) + '</span>' +
-            '<button id="so-minimize-btn" class="so-toggle-btn" tabindex="-1">' + btnLabel + '</button>' +
+            '<span class="so-header-btns">' +
+                '<button id="so-settings-btn" class="so-toggle-btn so-gear-btn" tabindex="-1">' +
+                    '<span class="so-dots-icon">...</span></button>' +
+                '<button id="so-minimize-btn" class="so-toggle-btn" tabindex="-1">' + btnLabel + '</button>' +
+            '</span>' +
             '</div>';
     }
 
@@ -961,7 +1037,7 @@
         root.className = 'mo-panel';
 
         // Hide until fighter panel is also active (units selected) and we have merc data
-        if (!state.mercVisible || !state.inGame ||
+        if (!state.showMercAdviser || !state.mercVisible || !state.inGame ||
             !state.dashboardActions || state.dashboardActions.length === 0 ||
             !state.windshieldActions || state.windshieldActions.length === 0) {
             addClass(root, 'so-hidden');
@@ -983,7 +1059,7 @@
 
         // Evaluate PUSH/HOLD forecast for current wave + next 4
         var pushForecast = [];
-        if (eng.evaluatePushHold && result.totalFighters > 0) {
+        if (state.showPushForecast && eng.evaluatePushHold && result.totalFighters > 0) {
             for (var fw = state.waveNum; fw < state.waveNum + 5; fw++) {
                 var ph = eng.evaluatePushHold(fw, result.defenseValue, result.attackValue);
                 if (ph) {
@@ -1231,8 +1307,8 @@
 
         root.className = 'sc-panel';
 
-        // Hide in bot games or when user closed the panel
-        if (state.isBotGame || !state.scoutingVisible) {
+        // Hide in bot games, when scouting disabled, or when user closed the panel
+        if (state.isBotGame || !state.showScouting || !state.scoutingVisible) {
             addClass(root, 'so-hidden');
             root.innerHTML = '';
             return;
@@ -1375,6 +1451,130 @@
     }
 
     // =========================================================================
+    //  Main menu settings link (visible only on home screen)
+    // =========================================================================
+
+    function renderMainMenuLink() {
+        var root = document.getElementById(MAINMENU_ID);
+        if (!root) return;
+
+        // Show only when NOT in-game (main menu / lobby)
+        var inGame = state.inGame && state.dashboardActions && state.dashboardActions.length > 0;
+        if (inGame) {
+            root.className = 'so-mm-link so-hidden';
+            return;
+        }
+
+        root.className = 'so-mm-link';
+        root.innerHTML = '<span class="so-mm-text">| Smart Overlay Settings</span>';
+
+        root.onclick = function () {
+            state.settingsVisible = !state.settingsVisible;
+            renderSettings();
+        };
+    }
+
+    // =========================================================================
+    //  Settings panel rendering
+    // =========================================================================
+
+    function renderSettings() {
+        var root = document.getElementById(SETTINGS_ID);
+        if (!root) return;
+
+        root.className = 'sg-panel';
+
+        if (!state.settingsVisible) {
+            addClass(root, 'so-hidden');
+            root.innerHTML = '';
+            return;
+        }
+
+        var html = '<div class="sg-header">' +
+            '<span class="sg-header-title">Settings</span>' +
+            '<button id="sg-close-btn" class="sg-toggle-btn" tabindex="-1">\u00d7</button>' +
+            '</div>';
+
+        html += renderToggleRow('showScouting', 'Scouting', false);
+        html += renderToggleRow('showHotkeyBadges', 'Hotkey Badges', false);
+        html += renderToggleRow('showMercAdviser', 'Merc Adviser', false);
+        html += renderToggleRow('showPushForecast', 'Push/Hold Forecast', true);
+        html += renderToggleRow('showDefenseStrength', 'Defense Strength', false);
+
+        root.innerHTML = html;
+        bindSettingsEvents();
+    }
+
+    function renderToggleRow(key, label, isSub) {
+        var active = state[key];
+        var disabled = false;
+
+        // Push/Hold is a sub-option of Merc Adviser
+        if (key === 'showPushForecast' && !state.showMercAdviser) {
+            disabled = true;
+            active = false;
+        }
+
+        var rowCls = 'sg-toggle-row';
+        if (isSub) rowCls += ' sg-toggle-sub';
+        if (disabled) rowCls += ' sg-toggle-disabled';
+
+        var indicatorCls = 'sg-indicator' + (active ? ' sg-toggle-active' : '');
+
+        return '<div class="' + rowCls + '" data-setting="' + escapeAttr(key) + '">' +
+            '<span class="sg-label">' + escapeHtml(label) + '</span>' +
+            '<span class="' + indicatorCls + '">' + (active ? 'ON' : 'OFF') + '</span>' +
+            '</div>';
+    }
+
+    function bindSettingsEvents() {
+        var root = document.getElementById(SETTINGS_ID);
+        if (!root) return;
+
+        var closeBtn = document.getElementById('sg-close-btn');
+        if (closeBtn) {
+            closeBtn.onclick = function () {
+                state.settingsVisible = false;
+                renderSettings();
+            };
+        }
+
+        var rows = root.getElementsByClassName('sg-toggle-row');
+        for (var i = 0; i < rows.length; i++) {
+            (function (row) {
+                row.onclick = function () {
+                    if (hasClass(row, 'sg-toggle-disabled')) return;
+                    var key = row.getAttribute('data-setting');
+                    if (!key) return;
+                    state[key] = !state[key];
+
+                    // Side effects
+                    if (key === 'showHotkeyBadges') {
+                        if (!state.showHotkeyBadges) {
+                            resetHotkeyBadges();
+                        } else {
+                            scheduleHotkeyInject();
+                        }
+                    }
+                    if (key === 'showScouting' && !state.showScouting) {
+                        state.scoutingPlayers = {};
+                        state.scoutingVisible = false;
+                    }
+                    if (key === 'showMercAdviser' && !state.showMercAdviser) {
+                        state.showPushForecast = false;
+                    }
+
+                    saveSettings();
+                    renderSettings();
+                    renderFighter();
+                    renderMerc();
+                    renderScouting();
+                };
+            })(rows[i]);
+        }
+    }
+
+    // =========================================================================
     //  Public API
     // =========================================================================
 
@@ -1383,6 +1583,7 @@
         renderFighter: renderFighter,
         renderMerc: renderMerc,
         renderScouting: renderScouting,
+        renderSettings: renderSettings,
         setState: function (newState) {
             for (var key in newState) {
                 if (newState.hasOwnProperty(key)) {

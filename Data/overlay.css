@@ -944,3 +944,160 @@
     min-width: 16px;
     padding: 2px 3px;
 }
+
+/* ============================================================
+   Main menu settings link (visible on home screen only)
+   ============================================================ */
+.so-mm-link {
+    position: fixed;
+    left: 72px;
+    top: 43px;
+    z-index: 9998;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.so-mm-text {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(180, 190, 200, 0.5);
+    letter-spacing: 0.5px;
+    transition: color 0.15s ease;
+}
+
+.so-mm-link:hover .so-mm-text {
+    color: rgba(180, 190, 200, 0.85);
+}
+
+/* ============================================================
+   Settings panel (blue accent, narrower)
+   ============================================================ */
+.sg-panel {
+    position: fixed;
+    width: 260px;
+    background: rgba(15, 22, 36, 0.95);
+    border: 1px solid rgba(85, 134, 138, 0.7);
+    border-radius: 6px;
+    color: #e0e8ef;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    z-index: 10000;
+    overflow: hidden;
+    user-select: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    transition: opacity 0.2s ease;
+    top: 60px;
+    right: 10px;
+}
+
+.sg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(30, 50, 70, 0.8);
+    border-bottom: 1px solid rgba(85, 134, 138, 0.4);
+    cursor: move;
+}
+
+.sg-header-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #a8d8ea;
+}
+
+.sg-toggle-btn {
+    background: none;
+    border: 1px solid rgba(85, 134, 138, 0.5);
+    border-radius: 3px;
+    color: #8899aa;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 11px;
+}
+
+.sg-toggle-btn:hover {
+    color: #a8d8ea;
+    border-color: rgba(85, 134, 138, 0.8);
+}
+
+/* --- Toggle rows --- */
+.sg-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(85, 134, 138, 0.1);
+    transition: background 0.15s ease;
+}
+
+.sg-toggle-row:hover {
+    background: rgba(85, 134, 138, 0.1);
+}
+
+.sg-toggle-row:last-child {
+    border-bottom: none;
+}
+
+.sg-label {
+    font-size: 13px;
+    color: #d4e4f0;
+}
+
+.sg-indicator {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: rgba(120, 120, 120, 0.2);
+    color: #667788;
+    border: 1px solid rgba(120, 120, 120, 0.3);
+    min-width: 32px;
+    text-align: center;
+}
+
+.sg-toggle-active {
+    background: rgba(40, 160, 80, 0.25);
+    color: #60e090;
+    border-color: rgba(40, 160, 80, 0.4);
+}
+
+/* Sub-option (indented) */
+.sg-toggle-sub {
+    padding-left: 28px;
+}
+
+/* Disabled state (parent OFF) */
+.sg-toggle-disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.sg-toggle-disabled:hover {
+    background: none;
+}
+
+/* Header buttons group (gear + minimize side by side) */
+.so-header-btns {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+/* Settings "..." dots button */
+.so-gear-btn {
+    padding: 2px 4px;
+    line-height: 1;
+}
+
+.so-dots-icon {
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    line-height: 0.5;
+    display: inline-block;
+    vertical-align: middle;
+}
