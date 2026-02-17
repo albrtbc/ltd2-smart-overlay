@@ -579,8 +579,8 @@
         return /upgrade|king|train\s*worker/.test(lower);
     }
 
-    // Master map persists for the entire game — never rebuilt, only merged into.
-    // { iconName: { label, small } }
+    // Master map: icon name → { label, small }. Updated every refresh so
+    // shortcuts stay correct after rerolls.
     var masterShortcutMap = {};
     var hotkeyTimer = null;
     var hotkeyRetryTimer = null;
@@ -625,7 +625,6 @@
                 var key = iconBaseName(a.image);
                 var sc = extractShortcut(a.header);
                 if (!key || !sc) continue;
-                if (masterShortcutMap[key]) continue; // already known
                 var small = sources[s].forceSmall || isSmallBadgeAction(a.header);
                 masterShortcutMap[key] = { label: sc, small: small };
             }
@@ -675,21 +674,29 @@
                 var name = iconBaseName(img.getAttribute('src'));
                 if (!name || !masterShortcutMap[name]) continue;
 
-                // Check if this img already has a badge sibling
                 var parent = img.parentNode;
                 if (!parent) continue;
-                var hasBadge = false;
+                var info = masterShortcutMap[name];
+
+                // Check if this img already has a badge sibling
+                var existingBadge = null;
                 var children = parent.childNodes;
                 for (var c = 0; c < children.length; c++) {
                     if (children[c].className &&
                         (' ' + children[c].className + ' ').indexOf(' so-hotkey-badge ') !== -1) {
-                        hasBadge = true;
+                        existingBadge = children[c];
                         break;
                     }
                 }
-                if (hasBadge) continue;
 
-                var info = masterShortcutMap[name];
+                if (existingBadge) {
+                    // Update label if shortcut changed (e.g. after reroll)
+                    if (existingBadge.textContent !== info.label) {
+                        existingBadge.textContent = info.label;
+                    }
+                    continue;
+                }
+
                 var badge = document.createElement('span');
                 badge.className = info.small
                     ? 'so-hotkey-badge so-hotkey-sm'
