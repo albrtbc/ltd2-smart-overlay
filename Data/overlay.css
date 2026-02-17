@@ -24,14 +24,14 @@
 
 /* Fighter panel default position (top-left, same padding as SOS button) */
 .so-panel {
-    top: 12px;
-    left: 12px;
+    top: 1.1vh;
+    left: 0.6vw;
 }
 
 /* Merc panel default position (below fighter panel) */
 .mo-panel {
-    top: 420px;
-    left: 12px;
+    top: 39vh;
+    left: 0.6vw;
     border-color: rgba(180, 120, 80, 0.7);
 }
 
@@ -746,8 +746,8 @@
 .sc-panel {
     width: 440px;
     max-height: 620px;
-    top: 10px;
-    left: 10px;
+    top: 1.1vh;
+    left: 0.6vw;
     border-color: rgba(0, 200, 200, 0.6);
     overflow-y: auto;
 }
@@ -951,8 +951,8 @@
    ============================================================ */
 .so-mm-btn {
     position: fixed;
-    left: 12px;
-    top: 12px;
+    left: 0.6vw;
+    top: 1.1vh;
     z-index: 9998;
     cursor: pointer;
     width: 38px;
@@ -994,8 +994,8 @@
     user-select: none;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     transition: opacity 0.2s ease;
-    top: 56px;
-    left: 12px;
+    top: 5.5vh;
+    left: 0.6vw;
     padding-bottom: 10px;
 }
 
