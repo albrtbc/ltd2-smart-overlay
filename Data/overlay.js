@@ -1160,6 +1160,11 @@
             if (scoreboardOpen && e.keyCode === 32) {
                 showingEnemies = !showingEnemies;
             }
+            // Left/Right arrows navigate fighter advisor wave
+            if (state.inGame && state.fighterVisible && !state.fighterMinimized) {
+                if (e.keyCode === 37) navigateFighterWave(-1);      // Left arrow
+                else if (e.keyCode === 39) navigateFighterWave(1);  // Right arrow
+            }
         });
 
         engine.on('refreshScoreboardInfo', function (scoreboardInfo) {
