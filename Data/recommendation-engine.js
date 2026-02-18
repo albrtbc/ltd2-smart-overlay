@@ -36,8 +36,7 @@ var SmartOverlayEngine = (function () {
     var STRENGTH_THRESHOLD = 0.04;
 
     // Push/hold tuning
-    var PUSH_MYTHIUM_MIN = 40;
-    var PUSH_BIAS = 0.04; // Sending is generally better than hoarding
+    var PUSH_BIAS = 0; // No inherent bias — let type matchups and value delta decide
 
     // Merc synergy bonus when attack type matches wave
     var MERC_SYNERGY_BONUS = 15;
@@ -688,19 +687,6 @@ var SmartOverlayEngine = (function () {
         var wave = findWave(waveNum) || findWave(21);
         if (!wave) return null;
 
-        // Mythium threshold: if below minimum, always HOLD (not enough to send meaningfully)
-        if (mythium !== undefined && mythium > 0 && mythium < PUSH_MYTHIUM_MIN) {
-            return {
-                recommendation: 'HOLD',
-                score: -0.5,
-                waveOffAvg: 1.0,
-                oppKillAvg: 1.0,
-                waveName: wave.name,
-                waveDmgType: wave.dmgType,
-                waveDefType: wave.defType
-            };
-        }
-
         // --- Type matchup score ---
         // How well does this wave's attack threaten the opponent's army?
         var waveOffTotal = 0, waveOffWeight = 0;
@@ -737,12 +723,12 @@ var SmartOverlayEngine = (function () {
         var valueDeltaScore = 0;
         if (opponentValueDelta !== undefined) {
             // delta <= 0 (under value) → positive push signal
-            // delta 0 to +20 (slight over-build) → neutral, still OK to push
-            // delta > +20 (significantly over-built) → penalize
-            var effectiveDelta = opponentValueDelta > 20
-                ? opponentValueDelta - 20
+            // delta 0 to +10 (slight over-build) → neutral
+            // delta > +10 (over-built) → penalize hard
+            var effectiveDelta = opponentValueDelta > 10
+                ? opponentValueDelta - 10
                 : Math.min(opponentValueDelta, 0);
-            valueDeltaScore = clamp(-effectiveDelta / 250, -0.3, 0.3);
+            valueDeltaScore = clamp(-effectiveDelta / 150, -0.3, 0.3);
         }
 
         // --- Wave impact scaling ---

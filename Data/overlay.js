@@ -75,6 +75,7 @@
         showPushForecast: true,
         pushResult: null,       // cached {recommendation, score, ...} from last scan
         pushTargetWave: 0,      // which wave the push/hold is for
+        inBuildPhase: false,    // true during build ("UNTIL WAVE X"), false during combat
         showDefenseStrength: true,
         showTopPicks: true,
         topFighterIcons: [],     // [{name, rank}] top-3 recommendation icons
@@ -212,16 +213,22 @@
 
     /**
      * Recalculate push/hold from cached defender data.
-     * Called only on enemy scan (Tab+Space), not on every render.
+     * Called on enemy scan (Tab+Space).
      *
-     * Timing: scans only produce new info during combat. During combat of
-     * wave N (waveNum=N), we evaluate for wave N+1 (mercs arrive next wave).
-     * During build "until wave N+1" (waveNum=N+1), the result persists.
-     * If user rescans during build, we refresh the same target wave.
+     * Phase-aware targeting:
+     *   Combat (wave N, waveNum=N): evaluate for N+1 (mercs arrive next wave)
+     *   Build (until wave N+1, waveNum=N+1): keep existing result, or evaluate
+     *     for waveNum if user forgot to scan during combat
      */
     function updatePushHold() {
         var eng = window.SmartOverlayEngine;
         if (!eng || !eng.evaluatePushHold || !state.defenderGrid) return;
+
+        // During build, don't overwrite valid result (data hasn't changed)
+        if (state.inBuildPhase && state.pushResult && state.pushTargetWave >= state.waveNum) {
+            return;
+        }
+
         var analysis = eng.analyzeGrid(state.defenderGrid);
         if (analysis.totalFighters === 0) return;
 
@@ -230,14 +237,9 @@
             var deltaMatch = state.defenderValueDelta.match(/\(([+-]?\d+)\)/);
             if (deltaMatch) oppDelta = parseInt(deltaMatch[1], 10);
         }
-        var targetWave;
-        if (state.pushResult && state.pushTargetWave >= state.waveNum) {
-            // Valid result for current/future wave — refresh same target
-            targetWave = state.pushTargetWave;
-        } else {
-            // No result or stale — first scan, evaluate for next wave
-            targetWave = state.waveNum + 1;
-        }
+        // Combat: evaluate for next wave (mercs arrive at waveNum+1)
+        // Build: evaluate for current wave (forgot to scan during combat)
+        var targetWave = state.inBuildPhase ? state.waveNum : state.waveNum + 1;
         var result = eng.evaluatePushHold(
             targetWave, analysis.defenseValue, analysis.attackValue,
             oppDelta, state.mythium
@@ -246,7 +248,8 @@
             state.pushResult = result;
             state.pushTargetWave = targetWave;
             console.log('[SmartOverlay] Push/Hold updated: W' + targetWave +
-                ' ' + result.recommendation + ' (score=' + result.score.toFixed(3) + ')');
+                ' ' + result.recommendation + ' (score=' + result.score.toFixed(3) +
+                ', phase=' + (state.inBuildPhase ? 'build' : 'combat') + ')');
         }
     }
 
@@ -963,6 +966,36 @@
             return;
         }
 
+        // --- Phase detection (build vs combat) ---
+        // The game shows "UNTIL WAVE X" during build phase and "WAVE X" during combat.
+        // Poll the DOM to detect the transition and invalidate push/hold at combat start.
+        var phaseCheckTimer = null;
+        function startPhaseDetection() {
+            if (phaseCheckTimer) clearInterval(phaseCheckTimer);
+            phaseCheckTimer = setInterval(function () {
+                if (!state.inGame) {
+                    clearInterval(phaseCheckTimer);
+                    phaseCheckTimer = null;
+                    return;
+                }
+                var bodyText = document.body.textContent || '';
+                var hasBuildText = /until wave/i.test(bodyText);
+                if (state.inBuildPhase && !hasBuildText) {
+                    // Build → Combat transition detected
+                    state.inBuildPhase = false;
+                    if (state.pushResult) {
+                        state.pushResult = null;
+                        state.pushTargetWave = 0;
+                        scheduleRender();
+                    }
+                    console.log('[SmartOverlay] Combat phase detected — push/hold invalidated');
+                } else if (!state.inBuildPhase && hasBuildText) {
+                    state.inBuildPhase = true;
+                    console.log('[SmartOverlay] Build phase detected');
+                }
+            }, 1000);
+        }
+
         // --- Fighter events ---
         engine.on('refreshWaveNumber', function (waveNumber) {
             // New game started — reset bot detection and scouting
@@ -977,6 +1010,8 @@
             }
             state.waveNum = waveNumber;
             state.inGame = true;
+            state.inBuildPhase = true;
+            startPhaseDetection();
             scheduleRender();
         });
 
@@ -1602,15 +1637,15 @@
         var totalVal = result.totalValue || 0;
         var html = '<div class="mo-defense-bar">';
 
-        // Defense types (armor) — what mercs attack against
-        html += '<span class="mo-defense-label">Armor</span>';
-        html += renderBreakdownRows(result.defenseBreakdown, result.defenseValue, totalVal);
-
         // Attack types — what kills mercs
         if (result.attackBreakdown) {
             html += '<span class="mo-defense-label mo-atk-label">Attack</span>';
             html += renderBreakdownRows(result.attackBreakdown, result.attackValue, totalVal);
         }
+
+        // Defense types (armor) — what mercs attack against
+        html += '<span class="mo-defense-label">Armor</span>';
+        html += renderBreakdownRows(result.defenseBreakdown, result.defenseValue, totalVal);
 
         return html + '</div>';
     }
