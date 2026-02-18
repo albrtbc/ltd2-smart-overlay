@@ -389,17 +389,25 @@
         var myMin = (myTeamDetected === 1) ? 1 : 5;
         var myMax = (myTeamDetected === 1) ? 4 : 8;
 
-        // Check for bot opponents before scouting anyone
+        // Classify players and check for bots
+        var hasOpponent = false;
         for (var b = 0; b < loadingStickerPlayers.length; b++) {
             var bp = loadingStickerPlayers[b];
             var isOpponent = bp.slot < myMin || bp.slot > myMax;
-            if (isOpponent && isBotName(bp.name)) {
-                state.isBotGame = true;
-                state.scoutingVisible = false;
-                console.log('[SmartOverlay] Bot game detected from loading sticker — scouting disabled.');
-                return;
+            if (isOpponent) {
+                hasOpponent = true;
+                if (isBotName(bp.name)) {
+                    state.isBotGame = true;
+                    state.scoutingVisible = false;
+                    console.log('[SmartOverlay] Bot game detected from loading sticker — scouting disabled.');
+                    return;
+                }
             }
         }
+
+        // If no opponents appeared in loading stickers, don't start scouting yet.
+        // Bots don't send loading stickers, so wait for scoreboard to confirm.
+        if (!hasOpponent) return;
 
         for (var j = 0; j < loadingStickerPlayers.length; j++) {
             var sp = loadingStickerPlayers[j];
