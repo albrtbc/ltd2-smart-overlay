@@ -73,6 +73,8 @@
         showHotkeyBadges: true,
         showMercAdviser: true,
         showPushForecast: true,
+        pushResult: null,       // cached {recommendation, score, ...} from last scan
+        pushTargetWave: 0,      // which wave the push/hold is for
         showDefenseStrength: true,
         showTopPicks: true,
         topFighterIcons: [],     // [{name, rank}] top-3 recommendation icons
@@ -201,8 +203,47 @@
                     (state.defenderNamePlain || '?') + '): ' +
                     p.grid.length + ' fighters, value=' + state.defenderValue +
                     ', delta=' + state.defenderValueDelta);
+                // Recalculate push/hold on scan
+                updatePushHold();
             }
             return;
+        }
+    }
+
+    /**
+     * Recalculate push/hold from cached defender data.
+     * Called only on enemy scan (Tab+Space), not on every render.
+     * If a valid result exists for the current wave, rescan refreshes same target.
+     * Only bumps to waveNum+1 when result is stale or missing.
+     */
+    function updatePushHold() {
+        var eng = window.SmartOverlayEngine;
+        if (!eng || !eng.evaluatePushHold || !state.defenderGrid) return;
+        var analysis = eng.analyzeGrid(state.defenderGrid);
+        if (analysis.totalFighters === 0) return;
+
+        var oppDelta = undefined;
+        if (state.defenderValueDelta) {
+            var deltaMatch = state.defenderValueDelta.match(/\(([+-]?\d+)\)/);
+            if (deltaMatch) oppDelta = parseInt(deltaMatch[1], 10);
+        }
+        var targetWave;
+        if (state.pushResult && state.pushTargetWave >= state.waveNum) {
+            // Valid result exists — refresh data for the same target wave
+            targetWave = state.pushTargetWave;
+        } else {
+            // Stale or no result — calculate for next wave
+            targetWave = state.waveNum + 1;
+        }
+        var result = eng.evaluatePushHold(
+            targetWave, analysis.defenseValue, analysis.attackValue,
+            oppDelta, state.mythium
+        );
+        if (result) {
+            state.pushResult = result;
+            state.pushTargetWave = targetWave;
+            console.log('[SmartOverlay] Push/Hold updated: W' + targetWave +
+                ' ' + result.recommendation + ' (score=' + result.score.toFixed(3) + ')');
         }
     }
 
@@ -1217,7 +1258,8 @@
         var hasSell = !state.showTopPicks;
         for (var si = 0; si < state.dashboardActions.length; si++) {
             var h = state.dashboardActions[si].header;
-            if (h && h.toLowerCase().indexOf('sell') !== -1) {
+            var hLower = h ? h.toLowerCase() : '';
+            if (hLower.indexOf('sell') !== -1 || hLower.indexOf('downgrade') !== -1) {
                 hasSell = true;
                 break;
             }
@@ -1416,27 +1458,13 @@
             state.waveNum
         );
 
-        // Evaluate PUSH/HOLD for current wave
-        var pushResult = null;
-        if (state.showPushForecast && eng.evaluatePushHold && result.totalFighters > 0) {
-            var oppDelta = undefined;
-            if (state.defenderValueDelta) {
-                var deltaMatch = state.defenderValueDelta.match(/\(([+-]?\d+)\)/);
-                if (deltaMatch) oppDelta = parseInt(deltaMatch[1], 10);
-            }
-            pushResult = eng.evaluatePushHold(
-                state.waveNum, result.defenseValue, result.attackValue,
-                oppDelta, state.mythium
-            );
-        }
-
         // Save scroll position before re-rendering
         var oldRecList = document.getElementById('mo-rec-list');
         var savedScroll = oldRecList ? oldRecList.scrollTop : 0;
 
         root.innerHTML = renderMercHeader() +
             renderDefenseBreakdown(result) +
-            renderPushIndicator(pushResult) +
+            renderPushIndicator() +
             renderMercRecs(result.recommendations) +
             renderMercFooter(result.totalScored);
 
@@ -1584,14 +1612,28 @@
         return html + '</div>';
     }
 
-    function renderPushIndicator(ph) {
-        if (!ph) return '';
+    function renderPushIndicator() {
+        if (!state.showPushForecast || !state.inGame) return '';
+        var ph = state.pushResult;
+        // If push result exists but target wave already passed, it's stale
+        if (ph && state.pushTargetWave < state.waveNum) {
+            ph = null;
+            state.pushResult = null;
+        }
+        if (!ph) {
+            // No scan data — prompt user to scan
+            return '<div class="mo-forecast">' +
+                '<div class="mo-fc-chip mo-fc-missing">' +
+                '<span class="mo-fc-label">SCAN ENEMY (Tab+Space)</span>' +
+                '</div></div>';
+        }
         var cls = ph.recommendation === 'PUSH' ? 'mo-fc-push' : 'mo-fc-hold';
         var reason = ph.waveDmgType + ' atk / ' + ph.waveDefType + ' def';
+        var label = 'W' + state.pushTargetWave + ' ' + ph.recommendation;
         return '<div class="mo-forecast">' +
             '<div class="mo-fc-chip mo-fc-current ' + cls + '" title="' +
             escapeAttr(reason) + '">' +
-            '<span class="mo-fc-label">' + ph.recommendation + '</span>' +
+            '<span class="mo-fc-label">' + label + '</span>' +
             '</div></div>';
     }
 

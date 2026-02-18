@@ -685,7 +685,7 @@ var SmartOverlayEngine = (function () {
      * @param {number} [mythium] - Player's current mythium.
      */
     function evaluatePushHold(waveNum, defenseValue, attackValue, opponentValueDelta, mythium) {
-        var wave = findWave(waveNum);
+        var wave = findWave(waveNum) || findWave(21);
         if (!wave) return null;
 
         // Mythium threshold: if below minimum, always HOLD (not enough to send meaningfully)
@@ -733,15 +733,16 @@ var SmartOverlayEngine = (function () {
 
         // --- Value delta signal ---
         // Opponent at or below recommended value → push is good
-        // Only penalize when opponent is significantly over-built
+        // Opponent over-built → hold (stronger defense)
         var valueDeltaScore = 0;
         if (opponentValueDelta !== undefined) {
-            // delta <= 0 (at or under value) → positive push signal
-            // delta > 0 (over-built) → only penalize above +50g buffer
-            var effectiveDelta = opponentValueDelta > 50
-                ? opponentValueDelta - 50
+            // delta <= 0 (under value) → positive push signal
+            // delta 0 to +20 (slight over-build) → neutral, still OK to push
+            // delta > +20 (significantly over-built) → penalize
+            var effectiveDelta = opponentValueDelta > 20
+                ? opponentValueDelta - 20
                 : Math.min(opponentValueDelta, 0);
-            valueDeltaScore = clamp(-effectiveDelta / 400, -0.3, 0.3);
+            valueDeltaScore = clamp(-effectiveDelta / 250, -0.3, 0.3);
         }
 
         // --- Wave impact scaling ---

@@ -400,6 +400,18 @@
     border-color: rgba(200, 120, 40, 0.7);
 }
 
+.mo-fc-missing {
+    background: rgba(200, 40, 40, 0.3);
+    border-color: rgba(200, 40, 40, 0.7);
+    color: #ff6666;
+    animation: mo-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes mo-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 /* Attack type colors (Pierce, Impact, Magic, Pure) */
 .mo-def-chip.mo-def-pierce {
     background: rgba(200, 80, 80, 0.2);
