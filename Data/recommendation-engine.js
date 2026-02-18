@@ -732,30 +732,30 @@ var SmartOverlayEngine = (function () {
         var typeScore = offScore * 0.7 - defScore * 0.3;
 
         // --- Value delta signal ---
-        // If opponent is below recommended value, it's a good time to push
+        // Opponent at or below recommended value → push is good
+        // Only penalize when opponent is significantly over-built
         var valueDeltaScore = 0;
-        if (opponentValueDelta !== undefined && opponentValueDelta !== 0) {
-            // Negative delta (opponent under-built) → positive push signal
-            // -100g → +0.2 push, +100g → -0.2 hold
-            valueDeltaScore = clamp(-opponentValueDelta / 500, -0.3, 0.3);
+        if (opponentValueDelta !== undefined) {
+            // delta <= 0 (at or under value) → positive push signal
+            // delta > 0 (over-built) → only penalize above +50g buffer
+            var effectiveDelta = opponentValueDelta > 50
+                ? opponentValueDelta - 50
+                : Math.min(opponentValueDelta, 0);
+            valueDeltaScore = clamp(-effectiveDelta / 400, -0.3, 0.3);
         }
 
-        // --- Wave difficulty scaling ---
-        // Later waves are harder to leak on; early waves are prime push windows
-        var wavePenalty = 0;
-        if (waveNum >= 15) {
-            wavePenalty = (waveNum - 14) * 0.02;
-        } else if (waveNum <= 8) {
-            wavePenalty = -(8 - waveNum) * 0.015;
+        // --- Wave impact scaling ---
+        // Waves 1-10: leaks cost less gold, pushing is less impactful
+        // Waves 11+: leaks are game-changers that decide matches → push bonus
+        var waveBonus = 0;
+        if (waveNum >= 11) {
+            waveBonus = (waveNum - 10) * 0.015;
+        } else {
+            waveBonus = -(10 - waveNum) * 0.008;
         }
 
         // --- Combined score ---
-        // Start with push bias (sending is generally better than hoarding)
-        var pushScore = PUSH_BIAS + typeScore;
-        if (opponentValueDelta !== undefined && opponentValueDelta !== 0) {
-            pushScore += valueDeltaScore;
-        }
-        pushScore -= wavePenalty;
+        var pushScore = PUSH_BIAS + typeScore + valueDeltaScore + waveBonus;
 
         return {
             recommendation: pushScore >= 0 ? 'PUSH' : 'HOLD',
