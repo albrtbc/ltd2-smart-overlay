@@ -215,10 +215,12 @@
      * Recalculate push/hold from cached defender data.
      * Called on enemy scan (Tab+Space).
      *
-     * Phase-aware targeting:
-     *   Combat (wave N, waveNum=N): evaluate for N+1 (mercs arrive next wave)
-     *   Build (until wave N+1, waveNum=N+1): keep existing result, or evaluate
-     *     for waveNum if user forgot to scan during combat
+     * Evaluates two waves ahead (N+1 and N+2) and picks the best:
+     *   - If N+1 is PUSH → show "W(N+1) PUSH" (send now)
+     *   - If N+1 is HOLD but N+2 is PUSH → show "W(N+2) PUSH" (save for big push)
+     *   - If both are HOLD → show "HOLD"
+     *
+     * During build phase, keeps existing result (opponent data unchanged).
      */
     function updatePushHold() {
         var eng = window.SmartOverlayEngine;
@@ -237,19 +239,43 @@
             var deltaMatch = state.defenderValueDelta.match(/\(([+-]?\d+)\)/);
             if (deltaMatch) oppDelta = parseInt(deltaMatch[1], 10);
         }
-        // Combat: evaluate for next wave (mercs arrive at waveNum+1)
-        // Build: evaluate for current wave (forgot to scan during combat)
-        var targetWave = state.inBuildPhase ? state.waveNum : state.waveNum + 1;
-        var result = eng.evaluatePushHold(
-            targetWave, analysis.defenseValue, analysis.attackValue,
+
+        var baseWave = state.inBuildPhase ? state.waveNum : state.waveNum + 1;
+        var r1 = eng.evaluatePushHold(
+            baseWave, analysis.defenseValue, analysis.attackValue,
             oppDelta, state.mythium
         );
-        if (result) {
-            state.pushResult = result;
+        var r2 = eng.evaluatePushHold(
+            baseWave + 1, analysis.defenseValue, analysis.attackValue,
+            oppDelta, state.mythium
+        );
+
+        // Pick best option: immediate PUSH wins, otherwise save for N+2 PUSH
+        var chosen = null;
+        var targetWave = baseWave;
+        if (r1 && r1.score >= 0) {
+            // N+1 is PUSH — send now
+            chosen = r1;
+            targetWave = baseWave;
+        } else if (r2 && r2.score >= 0) {
+            // N+1 is HOLD but N+2 is PUSH — save for big push
+            chosen = r2;
+            targetWave = baseWave + 1;
+        } else if (r1) {
+            // Both HOLD — show the less negative one
+            chosen = r1;
+            targetWave = baseWave;
+        }
+
+        if (chosen) {
+            state.pushResult = chosen;
             state.pushTargetWave = targetWave;
-            console.log('[SmartOverlay] Push/Hold updated: W' + targetWave +
-                ' ' + result.recommendation + ' (score=' + result.score.toFixed(3) +
-                ', phase=' + (state.inBuildPhase ? 'build' : 'combat') + ')');
+            var phase = state.inBuildPhase ? 'build' : 'combat';
+            console.log('[SmartOverlay] Push/Hold: W' + targetWave +
+                ' ' + chosen.recommendation + ' (score=' + chosen.score.toFixed(3) +
+                ', W' + baseWave + '=' + (r1 ? r1.score.toFixed(3) : 'n/a') +
+                ', W' + (baseWave + 1) + '=' + (r2 ? r2.score.toFixed(3) : 'n/a') +
+                ', phase=' + phase + ')');
         }
     }
 
@@ -981,7 +1007,7 @@
                 var bodyText = document.body.textContent || '';
                 var hasBuildText = /until wave/i.test(bodyText);
                 if (state.inBuildPhase && !hasBuildText) {
-                    // Build → Combat transition detected
+                    // Build → Combat transition detected — always invalidate
                     state.inBuildPhase = false;
                     if (state.pushResult) {
                         state.pushResult = null;
@@ -1665,9 +1691,14 @@
                 '<span class="mo-fc-label">SCAN ENEMY (Tab+Space)</span>' +
                 '</div></div>';
         }
-        var cls = ph.recommendation === 'PUSH' ? 'mo-fc-push' : 'mo-fc-hold';
+        var isPush = ph.recommendation === 'PUSH';
+        var cls = isPush ? 'mo-fc-push' : 'mo-fc-hold';
         var reason = ph.waveDmgType + ' atk / ' + ph.waveDefType + ' def';
-        var label = 'W' + state.pushTargetWave + ' ' + ph.recommendation;
+        // PUSH shows target wave (W3 PUSH or W4 PUSH for save-then-push)
+        // HOLD shows no wave number (neither wave is worth pushing)
+        var label = isPush
+            ? 'W' + state.pushTargetWave + ' PUSH'
+            : 'HOLD';
         return '<div class="mo-forecast">' +
             '<div class="mo-fc-chip mo-fc-current ' + cls + '" title="' +
             escapeAttr(reason) + '">' +

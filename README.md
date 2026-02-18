@@ -4,10 +4,10 @@ A BepInEx plugin for **Legion TD 2** that provides real-time in-game overlays wi
 
 ## Features
 
-- **Fighter Advisor** — Recommends optimal units using multi-wave lookahead (scores against current + next 2 waves), type matchups, gold/HP efficiency, upgrade detection, and tier relevance
+- **Fighter Advisor** — Recommends optimal units using multi-wave lookahead (scores against current + next wave), type matchups, gold/HP efficiency, and tier relevance
 - **STRONG/WEAK/NEUTRAL indicator** — Evaluates your army's strength with wave-count-aware weighting (swarm vs boss waves) and shows type advantage percentage
 - **Mercenary Advisor** — Scores mercs against the opponent's fighter composition with wave synergy bonus (matching wave attack type), DPS factor, and mythium efficiency
-- **PUSH/HOLD Forecast** — 5-wave forecast combining type matchups, opponent value delta (under/over-built signal), mythium threshold, and wave difficulty scaling
+- **PUSH/HOLD Indicator** — Evaluates the next 2 waves for push opportunities using type matchups, opponent value delta, and wave impact scaling. Auto-detects build vs combat phase
 - **Scouting Panel** — Fetches win/loss, Elo, top masterminds, and wave 1 openers for all players via the Drachbot API
 - **Settings Panel** — Toggle individual features on/off (Scouting, Hotkey Badges, Merc Adviser, Push/Hold Forecast, Defense Strength); settings persist across sessions
 - **Draggable panels** — All panels can be repositioned and minimized; positions persist across games
@@ -78,10 +78,10 @@ Once installed, the overlays appear automatically when you enter a match:
 
 | Panel | Activation | Description |
 |-------|-----------|-------------|
-| **Fighter Advisor** | Automatic during build phase | Unit recommendations scored across current + next 2 waves |
+| **Fighter Advisor** | Automatic during build phase | Unit recommendations scored across current + next wave |
 | **STRONG/WEAK** | Automatic (updates on purchase) | Army type strength vs current wave with percentage detail |
 | **Merc Advisor** | Press **Tab + Space** to scan enemy | Opponent breakdown + best mercs (with wave synergy indicators) |
-| **PUSH/HOLD** | After scanning enemy (Tab + Space) | 5-wave forecast using type matchups + opponent value analysis |
+| **PUSH/HOLD** | After scanning enemy (Tab + Space) | 2-wave lookahead: shows best wave to push (e.g. W3 PUSH or W4 PUSH to save-then-push) |
 | **Scouting** | Press **Tab** to open scoreboard | Auto-fetches player stats from Drachbot API |
 | **Settings** | **SOS** button (main menu) or **...** button (in-game) | Toggle overlay features on/off |
 
