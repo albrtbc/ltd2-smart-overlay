@@ -37,6 +37,7 @@ var SmartOverlayEngine = (function () {
 
     // Push/hold tuning
     var PUSH_MYTHIUM_MIN = 40;
+    var PUSH_BIAS = 0.04; // Sending is generally better than hoarding
 
     // Merc synergy bonus when attack type matches wave
     var MERC_SYNERGY_BONUS = 15;
@@ -723,7 +724,12 @@ var SmartOverlayEngine = (function () {
         }
         var oppKillAvg = oppKillWeight > 0 ? oppKillTotal / oppKillWeight : 1.0;
 
-        var typeScore = (waveOffAvg - 1.0) - (oppKillAvg - 1.0);
+        // Type score: wave offense matters more than opponent's ability to kill wave.
+        // A wave that threatens the opponent's army is a good push opportunity,
+        // even if the opponent can kill the wave creatures efficiently.
+        var offScore = waveOffAvg - 1.0;  // positive = wave hurts opponent
+        var defScore = oppKillAvg - 1.0;  // positive = opponent kills wave well
+        var typeScore = offScore * 0.7 - defScore * 0.3;
 
         // --- Value delta signal ---
         // If opponent is below recommended value, it's a good time to push
@@ -738,15 +744,14 @@ var SmartOverlayEngine = (function () {
         // Later waves are harder to leak on; early waves are prime push windows
         var wavePenalty = 0;
         if (waveNum >= 15) {
-            wavePenalty = (waveNum - 14) * 0.03;
+            wavePenalty = (waveNum - 14) * 0.02;
         } else if (waveNum <= 8) {
-            // Slight push bonus for early waves (easier to leak)
-            wavePenalty = -(8 - waveNum) * 0.01;
+            wavePenalty = -(8 - waveNum) * 0.015;
         }
 
         // --- Combined score ---
-        // Type matchup is the primary signal; value delta and wave penalty are additive modifiers
-        var pushScore = typeScore;
+        // Start with push bias (sending is generally better than hoarding)
+        var pushScore = PUSH_BIAS + typeScore;
         if (opponentValueDelta !== undefined && opponentValueDelta !== 0) {
             pushScore += valueDeltaScore;
         }

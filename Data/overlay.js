@@ -1416,25 +1416,18 @@
             state.waveNum
         );
 
-        // Evaluate PUSH/HOLD forecast for current wave + next 4
-        var pushForecast = [];
+        // Evaluate PUSH/HOLD for current wave
+        var pushResult = null;
         if (state.showPushForecast && eng.evaluatePushHold && result.totalFighters > 0) {
-            // Parse opponent value delta for push/hold signal
             var oppDelta = undefined;
             if (state.defenderValueDelta) {
                 var deltaMatch = state.defenderValueDelta.match(/\(([+-]?\d+)\)/);
                 if (deltaMatch) oppDelta = parseInt(deltaMatch[1], 10);
             }
-            for (var fw = state.waveNum; fw < state.waveNum + 5; fw++) {
-                var ph = eng.evaluatePushHold(
-                    fw, result.defenseValue, result.attackValue,
-                    oppDelta, state.mythium
-                );
-                if (ph) {
-                    ph.waveNum = fw;
-                    pushForecast.push(ph);
-                }
-            }
+            pushResult = eng.evaluatePushHold(
+                state.waveNum, result.defenseValue, result.attackValue,
+                oppDelta, state.mythium
+            );
         }
 
         // Save scroll position before re-rendering
@@ -1443,7 +1436,7 @@
 
         root.innerHTML = renderMercHeader() +
             renderDefenseBreakdown(result) +
-            renderPushForecast(pushForecast) +
+            renderPushIndicator(pushResult) +
             renderMercRecs(result.recommendations) +
             renderMercFooter(result.totalScored);
 
@@ -1591,21 +1584,15 @@
         return html + '</div>';
     }
 
-    function renderPushForecast(forecast) {
-        if (!forecast || forecast.length === 0) return '';
-        var html = '<div class="mo-forecast">';
-        for (var i = 0; i < forecast.length; i++) {
-            var ph = forecast[i];
-            var cls = ph.recommendation === 'PUSH' ? 'mo-fc-push' : 'mo-fc-hold';
-            if (i === 0) cls += ' mo-fc-current';
-            html += '<div class="mo-fc-chip ' + cls + '" title="' +
-                escapeAttr(ph.waveDmgType + ' atk / ' + ph.waveDefType + ' def') + '">' +
-                '<span class="mo-fc-wave">W' + ph.waveNum + '</span>' +
-                '<span class="mo-fc-label">' + ph.recommendation + '</span>' +
-                '</div>';
-        }
-        html += '</div>';
-        return html;
+    function renderPushIndicator(ph) {
+        if (!ph) return '';
+        var cls = ph.recommendation === 'PUSH' ? 'mo-fc-push' : 'mo-fc-hold';
+        var reason = ph.waveDmgType + ' atk / ' + ph.waveDefType + ' def';
+        return '<div class="mo-forecast">' +
+            '<div class="mo-fc-chip mo-fc-current ' + cls + '" title="' +
+            escapeAttr(reason) + '">' +
+            '<span class="mo-fc-label">' + ph.recommendation + '</span>' +
+            '</div></div>';
     }
 
     function renderMercRecs(recs) {
@@ -1903,8 +1890,8 @@
             'Show the STRONG/NEUTRAL/WEAK indicator for your army vs the current wave.', false);
         html += renderToggleRow('showMercAdviser', 'Merc Adviser',
             'Show the merc advisor panel with opponent breakdown and merc recommendations.', false);
-        html += renderToggleRow('showPushForecast', 'Push/Hold Forecast',
-            'Show the 5-wave push/hold forecast inside the merc advisor panel.', true);
+        html += renderToggleRow('showPushForecast', 'Push/Hold',
+            'Show PUSH or HOLD recommendation for the current wave inside the merc advisor panel.', true);
         html += renderToggleRow('showHotkeyBadges', 'Hotkey Badges',
             'Show keyboard shortcut labels on the game\'s unit, merc, and king action bars.', false);
 
