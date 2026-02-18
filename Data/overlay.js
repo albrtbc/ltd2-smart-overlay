@@ -81,7 +81,9 @@
         topFighterIcons: [],     // [{name, rank}] top-3 recommendation icons
         // Update notification
         updateAvailable: null,   // {version, url} when a newer release exists
-        updateDismissed: false
+        updateDismissed: false,
+        // Fighter wave navigation (0 = auto/current wave)
+        fighterViewWave: 0
     };
 
     var renderTimer = null;
@@ -1035,6 +1037,7 @@
                 resetHotkeyBadges();
             }
             state.waveNum = waveNumber;
+            state.fighterViewWave = 0;
             state.inGame = true;
             state.inBuildPhase = true;
             startPhaseDetection();
@@ -1272,8 +1275,10 @@
         var eng = window.SmartOverlayEngine;
         if (!eng) return;
 
+        var displayWave = state.fighterViewWave || state.waveNum;
+
         var result = eng.scoreFromDashboardActions(
-            state.dashboardActions, state.waveNum, state.gold
+            state.dashboardActions, displayWave, state.gold
         );
 
         // Defense strength: current board types + value vs recommended
@@ -1281,7 +1286,7 @@
         if (state.showDefenseStrength && eng.evaluateDefenseStrength && state.myGrid) {
 
             var typeResult = eng.evaluateDefenseStrength(
-                state.waveNum, state.myDefenseValue, state.myAttackValue
+                displayWave, state.myDefenseValue, state.myAttackValue
             );
 
             if (typeResult) {
@@ -1358,6 +1363,14 @@
         bindFighterMinBtn();
     }
 
+    function navigateFighterWave(delta) {
+        var current = state.fighterViewWave || state.waveNum;
+        var newWave = current + delta;
+        if (newWave < 1 || newWave > 21) return;
+        state.fighterViewWave = newWave;
+        renderFighter();
+    }
+
     function bindFighterMinBtn() {
         var btn = document.getElementById('so-minimize-btn');
         if (btn) {
@@ -1373,15 +1386,27 @@
                 renderSettings();
             };
         }
+        var prev = document.getElementById('so-wave-prev');
+        var next = document.getElementById('so-wave-next');
+        if (prev) prev.onclick = function () { navigateFighterWave(-1); };
+        if (next) next.onclick = function () { navigateFighterWave(1); };
     }
 
     function renderFighterHeader() {
-        var waveText = state.waveNum > 0 ? 'Wave ' + state.waveNum : 'Pre-game';
+        var dw = state.fighterViewWave || state.waveNum;
+        var waveText = dw > 0 ? 'Wave ' + dw : 'Pre-game';
         var goldText = state.gold > 0 ? ' | ' + state.gold + 'g' : '';
         var btnLabel = state.fighterMinimized ? '+' : '\u2013';
+        var prevHide = dw <= 1 ? ' so-wave-nav-hidden' : '';
+        var nextHide = dw >= 21 ? ' so-wave-nav-hidden' : '';
+        var waveNav = state.inGame && dw > 0
+            ? '<button id="so-wave-prev" class="so-wave-nav' + prevHide + '" tabindex="-1">&lt;</button>' +
+              '<span class="so-wave-label">' + escapeHtml(waveText) + '</span>' +
+              '<button id="so-wave-next" class="so-wave-nav' + nextHide + '" tabindex="-1">&gt;</button>'
+            : escapeHtml(waveText);
         return '<div class="so-header">' +
             '<span class="so-header-title">Smart Overlay</span>' +
-            '<span class="so-header-wave">' + escapeHtml(waveText) + escapeHtml(goldText) + '</span>' +
+            '<span class="so-header-wave">' + waveNav + escapeHtml(goldText) + '</span>' +
             '<span class="so-header-btns">' +
                 '<button id="so-settings-btn" class="so-toggle-btn so-gear-btn" tabindex="-1">' +
                     '<span class="so-dots-icon">...</span></button>' +

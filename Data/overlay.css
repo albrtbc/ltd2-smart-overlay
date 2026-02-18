@@ -65,8 +65,36 @@
 }
 
 .so-header-wave {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
     font-size: 13px;
     color: #8899aa;
+}
+
+.so-wave-nav {
+    background: none;
+    border: none;
+    color: #8899aa;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 0 4px;
+    line-height: 1;
+    font-family: inherit;
+}
+
+.so-wave-nav:hover {
+    color: #a8d8ea;
+}
+
+.so-wave-nav-hidden {
+    visibility: hidden;
+}
+
+.so-wave-label {
+    min-width: 48px;
+    text-align: center;
 }
 
 .so-toggle-btn {
