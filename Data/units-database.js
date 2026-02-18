@@ -1,7 +1,7 @@
 /**
  * LTD2 Smart Overlay - Units Database
  * Auto-generated from Legion TD 2 API v11.07.1
- * 209 units (145 fighters)
+ * 211 units (147 fighters)
  */
 window.SmartOverlayUnits = [
   {
@@ -656,6 +656,60 @@ window.SmartOverlayUnits = [
     "upgradesTo": [],
     "flags": "flags_ground,flags_mechanical",
     "description": "Unmatched power, unmatched price tag."
+  },
+  {
+    "unitId": "pulsebot_unit_id",
+    "name": "Pulsebot",
+    "iconPath": "Icons/Pulsebot.png",
+    "attackType": "Impact",
+    "armorType": "Fortified",
+    "attackMode": "Melee",
+    "goldCost": "185",
+    "totalValue": "185",
+    "hp": "1940",
+    "dmgBase": "105",
+    "dps": "62",
+    "attackSpeed": "1.70000",
+    "attackRange": "100",
+    "moveSpeed": "300",
+    "moveType": "Ground",
+    "infoTier": "Tier-5",
+    "unitClass": "Fighter",
+    "categoryClass": "Standard",
+    "legionId": "mech_legion_id",
+    "upgradesFrom": [],
+    "upgradesTo": [
+      "units skybot_unit_id"
+    ],
+    "flags": "flags_ground,flags_mechanical",
+    "description": "Every attack releases a shockwave that deals bonus splash damage and applies a debuff to enemy defenses."
+  },
+  {
+    "unitId": "skybot_unit_id",
+    "name": "Skybot",
+    "iconPath": "Icons/Skybot.png",
+    "attackType": "Impact",
+    "armorType": "Fortified",
+    "attackMode": "Melee",
+    "goldCost": "355",
+    "totalValue": "540",
+    "hp": "5600",
+    "dmgBase": "195",
+    "dps": "174",
+    "attackSpeed": "1.70000",
+    "attackRange": "100",
+    "moveSpeed": "300",
+    "moveType": "Air",
+    "infoTier": "Tier-5",
+    "unitClass": "Fighter",
+    "categoryClass": "Standard",
+    "legionId": "mech_legion_id",
+    "upgradesFrom": [
+      "units pulsebot_unit_id"
+    ],
+    "upgradesTo": [],
+    "flags": "flags_flying,flags_mechanical",
+    "description": "Flying. Specialized for combat, its increase in power is matched only by the truculence of its upgraded AI. Now applies 3 stacks of the debuff."
   },
   {
     "unitId": "buzz_unit_id",
