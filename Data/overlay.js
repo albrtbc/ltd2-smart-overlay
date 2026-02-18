@@ -213,9 +213,11 @@
     /**
      * Recalculate push/hold from cached defender data.
      * Called only on enemy scan (Tab+Space), not on every render.
-     * Target wave = waveNum (the wave shown in the top indicator).
-     * refreshWaveNumber already advances to the next wave at build phase start,
-     * so waveNum is always the wave we're preparing for.
+     *
+     * Timing: scans only produce new info during combat. During combat of
+     * wave N (waveNum=N), we evaluate for wave N+1 (mercs arrive next wave).
+     * During build "until wave N+1" (waveNum=N+1), the result persists.
+     * If user rescans during build, we refresh the same target wave.
      */
     function updatePushHold() {
         var eng = window.SmartOverlayEngine;
@@ -228,7 +230,14 @@
             var deltaMatch = state.defenderValueDelta.match(/\(([+-]?\d+)\)/);
             if (deltaMatch) oppDelta = parseInt(deltaMatch[1], 10);
         }
-        var targetWave = state.waveNum;
+        var targetWave;
+        if (state.pushResult && state.pushTargetWave >= state.waveNum) {
+            // Valid result for current/future wave — refresh same target
+            targetWave = state.pushTargetWave;
+        } else {
+            // No result or stale — first scan, evaluate for next wave
+            targetWave = state.waveNum + 1;
+        }
         var result = eng.evaluatePushHold(
             targetWave, analysis.defenseValue, analysis.attackValue,
             oppDelta, state.mythium
@@ -965,11 +974,6 @@
                 myTeamDetected = 0;
                 scoutingDumped = false;
                 resetHotkeyBadges();
-            }
-            // Invalidate push/hold when wave advances
-            if (waveNumber !== state.waveNum && state.pushTargetWave < waveNumber) {
-                state.pushResult = null;
-                state.pushTargetWave = 0;
             }
             state.waveNum = waveNumber;
             state.inGame = true;
