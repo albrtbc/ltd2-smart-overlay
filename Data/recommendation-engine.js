@@ -30,16 +30,13 @@ var SmartOverlayEngine = (function () {
     var SCORE_BASE = 0.75;
     var SCORE_RANGE = 0.50;
 
-    // Multi-wave lookahead weights (current wave, next, next+1)
-    var WAVE_LOOKAHEAD = [0.60, 0.25, 0.15];
+    // Multi-wave lookahead weights (current wave, next wave as tiebreaker)
+    var WAVE_LOOKAHEAD = [0.90, 0.10];
 
     // Threshold for STRONG/WEAK classification
     var STRENGTH_THRESHOLD = 0.04;
 
     // Push/hold tuning
-    var PUSH_TYPE_WEIGHT = 0.35;
-    var PUSH_VALUE_WEIGHT = 0.50;
-    var PUSH_WAVE_WEIGHT = 0.15;
     var PUSH_MYTHIUM_MIN = 40;
 
     // Merc synergy bonus when attack type matches wave
@@ -766,17 +763,12 @@ var SmartOverlayEngine = (function () {
         }
 
         // --- Combined score ---
-        var hasValueData = opponentValueDelta !== undefined && opponentValueDelta !== 0;
-        var pushScore;
-        if (hasValueData) {
-            // Full formula with value data
-            pushScore = typeScore * PUSH_TYPE_WEIGHT +
-                        valueDeltaScore * PUSH_VALUE_WEIGHT -
-                        wavePenalty * PUSH_WAVE_WEIGHT;
-        } else {
-            // Fallback: type matchup + wave difficulty only
-            pushScore = typeScore - wavePenalty * 0.3;
+        // Type matchup is the primary signal; value delta and wave penalty are additive modifiers
+        var pushScore = typeScore;
+        if (opponentValueDelta !== undefined && opponentValueDelta !== 0) {
+            pushScore += valueDeltaScore;
         }
+        pushScore -= wavePenalty;
 
         return {
             recommendation: pushScore >= 0 ? 'PUSH' : 'HOLD',
