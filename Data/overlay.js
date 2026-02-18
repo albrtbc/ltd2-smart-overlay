@@ -213,8 +213,9 @@
     /**
      * Recalculate push/hold from cached defender data.
      * Called only on enemy scan (Tab+Space), not on every render.
-     * If a valid result exists for the current wave, rescan refreshes same target.
-     * Only bumps to waveNum+1 when result is stale or missing.
+     * Target wave = waveNum (the wave shown in the top indicator).
+     * refreshWaveNumber already advances to the next wave at build phase start,
+     * so waveNum is always the wave we're preparing for.
      */
     function updatePushHold() {
         var eng = window.SmartOverlayEngine;
@@ -227,14 +228,7 @@
             var deltaMatch = state.defenderValueDelta.match(/\(([+-]?\d+)\)/);
             if (deltaMatch) oppDelta = parseInt(deltaMatch[1], 10);
         }
-        var targetWave;
-        if (state.pushResult && state.pushTargetWave >= state.waveNum) {
-            // Valid result exists — refresh data for the same target wave
-            targetWave = state.pushTargetWave;
-        } else {
-            // Stale or no result — calculate for next wave
-            targetWave = state.waveNum + 1;
-        }
+        var targetWave = state.waveNum;
         var result = eng.evaluatePushHold(
             targetWave, analysis.defenseValue, analysis.attackValue,
             oppDelta, state.mythium
@@ -971,6 +965,11 @@
                 myTeamDetected = 0;
                 scoutingDumped = false;
                 resetHotkeyBadges();
+            }
+            // Invalidate push/hold when wave advances
+            if (waveNumber !== state.waveNum && state.pushTargetWave < waveNumber) {
+                state.pushResult = null;
+                state.pushTargetWave = 0;
             }
             state.waveNum = waveNumber;
             state.inGame = true;
