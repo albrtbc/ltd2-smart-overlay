@@ -18,12 +18,11 @@ var SmartOverlayEngine = (function () {
 
     // Scoring weights for fighter advisor (must sum to 100)
     var WEIGHTS = {
-        offensiveTypeMatch: 30,   // How well your unit's attack counters the wave's defense
-        defensiveTypeMatch: 22,   // How well your unit's armor resists the wave's attack
-        goldEfficiency:     15,   // DPS per gold spent
+        offensiveTypeMatch: 35,   // How well your unit's attack counters the wave's defense
+        defensiveTypeMatch: 25,   // How well your unit's armor resists the wave's attack
+        goldEfficiency:     17,   // DPS per gold spent
         hpEfficiency:       10,   // HP per gold — tankiness matters
-        upgradeBonus:       15,   // Bonus if upgrading an existing unit
-        tierRelevance:       8    // Penalty for over/under-tiered units
+        tierRelevance:      13    // Penalty for over/under-tiered units
     };
 
     // Score normalization: maps multiplier range [0.75, 1.25] to [0, 100]
@@ -113,18 +112,6 @@ var SmartOverlayEngine = (function () {
         var goldEff = cost > 0 ? (dps / cost) * 100 : 0;
         goldEff = clamp(goldEff, 0, 100);
 
-        // Upgrade bonus: if this unit upgrades from something on the board
-        var isUpgrade = false;
-        if (unit.upgradesFrom && boardUnits && boardUnits.length > 0) {
-            for (var i = 0; i < boardUnits.length; i++) {
-                if (boardUnits[i] === unit.upgradesFrom) {
-                    isUpgrade = true;
-                    break;
-                }
-            }
-        }
-        var upgradeScore = isUpgrade ? 100 : 0;
-
         // Tier relevance
         var tierScore = scoreTierRelevance(unit.infoTier, wave.wave);
 
@@ -132,7 +119,6 @@ var SmartOverlayEngine = (function () {
             (offensiveScore * WEIGHTS.offensiveTypeMatch +
              defensiveScore * WEIGHTS.defensiveTypeMatch +
              goldEff        * WEIGHTS.goldEfficiency +
-             upgradeScore   * WEIGHTS.upgradeBonus +
              tierScore      * WEIGHTS.tierRelevance) / 100;
 
         return {
@@ -141,7 +127,6 @@ var SmartOverlayEngine = (function () {
             offensiveMultiplier: offMult,
             defensiveMultiplier: defMult,
             goldEfficiency: Math.round(goldEff * 10) / 10,
-            isUpgrade: isUpgrade,
             cost: cost
         };
     }
@@ -154,10 +139,14 @@ var SmartOverlayEngine = (function () {
         var range = TIER_WAVE_MAP[tier];
         if (!range) return 50;
         if (waveNum >= range.min && waveNum <= range.max) return 100;
-        var distance = waveNum < range.min
-            ? range.min - waveNum
-            : waveNum - range.max;
-        return clamp(100 - distance * 15, 0, 100);
+        if (waveNum < range.min) {
+            // Buying high tier early — mild penalty (investing for the future is OK)
+            var earlyDist = range.min - waveNum;
+            return clamp(100 - earlyDist * 5, 50, 100);
+        }
+        // Buying low tier late — strong penalty (unit will underperform)
+        var lateDist = waveNum - range.max;
+        return clamp(100 - lateDist * 25, 0, 100);
     }
 
     /**
@@ -400,16 +389,11 @@ var SmartOverlayEngine = (function () {
 
                 var tierScore = scoreTierRelevance(dbUnit.infoTier, effectiveWave);
 
-                // Upgrade detection: game shows "Upgrade" in header for upgrades
-                var isUpgrade = !!(action.header && /upgrade/i.test(action.header));
-                var upgradeScore = isUpgrade ? 100 : 0;
-
                 var totalScore =
                     (blendedOff  * WEIGHTS.offensiveTypeMatch +
                      blendedDef  * WEIGHTS.defensiveTypeMatch +
                      goldEff     * WEIGHTS.goldEfficiency +
                      hpEff       * WEIGHTS.hpEfficiency +
-                     upgradeScore * WEIGHTS.upgradeBonus +
                      tierScore   * WEIGHTS.tierRelevance) / 100;
 
                 scored.push({

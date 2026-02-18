@@ -291,7 +291,8 @@
     function isBotName(name) {
         if (!name) return false;
         var plain = name.replace(/<[^>]+>/g, '').trim().toLowerCase();
-        return /\b(bot|ai)\b/.test(plain);
+        // LTD2 bot names: "Easy Bot", "Medium Bot", "Hard Bot", "Expert Bot", "Extreme Bot", etc.
+        return /\bbot\b/.test(plain);
     }
 
     var scoutingDumped = false;
@@ -349,6 +350,8 @@
     function captureFromLoadingSticker(slot, displayName) {
         if (!displayName || displayName === '_closed' || displayName === '_open' ||
             displayName === '(Closed)') return;
+        // Ignore NPC slots (9-12)
+        if (slot >= 9) return;
 
         // Avoid duplicates in our buffer
         for (var i = 0; i < loadingStickerPlayers.length; i++) {
@@ -385,6 +388,18 @@
 
         var myMin = (myTeamDetected === 1) ? 1 : 5;
         var myMax = (myTeamDetected === 1) ? 4 : 8;
+
+        // Check for bot opponents before scouting anyone
+        for (var b = 0; b < loadingStickerPlayers.length; b++) {
+            var bp = loadingStickerPlayers[b];
+            var isOpponent = bp.slot < myMin || bp.slot > myMax;
+            if (isOpponent && isBotName(bp.name)) {
+                state.isBotGame = true;
+                state.scoutingVisible = false;
+                console.log('[SmartOverlay] Bot game detected from loading sticker — scouting disabled.');
+                return;
+            }
+        }
 
         for (var j = 0; j < loadingStickerPlayers.length; j++) {
             var sp = loadingStickerPlayers[j];
