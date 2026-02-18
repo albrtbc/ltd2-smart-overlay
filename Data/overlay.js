@@ -23,6 +23,12 @@
     var MAINMENU_ID = 'so-mainmenu-link';
     var SCOUT_API = 'https://stats.drachbot.site/api/drachbot_overlay/';
     var RENDER_DEBOUNCE_MS = 100;
+    var TOP_PICK_RETRY_MS = 500;
+    var MATCH_TOLERANCE = 0.2;
+    var DRAG_MARGIN_X = 100;
+    var DRAG_MARGIN_Y = 40;
+    var VALUE_OK_THRESHOLD = 20;
+    var XHR_TIMEOUT_MS = 8000;
     var OVERLAY_VERSION = '0.0.0';
     var GITHUB_API_LATEST = 'https://api.github.com/repos/albrtbc/ltd2-smart-overlay/releases/latest';
 
@@ -126,6 +132,11 @@
             .replace(/"/g, '&quot;');
     }
 
+    function removeAllByClass(className) {
+        var els = document.getElementsByClassName(className);
+        while (els.length > 0) els[0].parentNode.removeChild(els[0]);
+    }
+
     function escapeAttr(str) { return escapeHtml(str); }
 
     function getIconUrl(iconPath) {
@@ -147,7 +158,7 @@
             topPickRetryTimer = setTimeout(function () {
                 topPickRetryTimer = null;
                 applyTopPickHighlight();
-            }, 500);
+            }, TOP_PICK_RETRY_MS);
         }, RENDER_DEBOUNCE_MS);
     }
 
@@ -253,7 +264,7 @@
         }
 
         // Accept if within 20% tolerance (upgrades may have slight cost differences)
-        if (!bestMatch || bestDiff > delta * 0.2) return;
+        if (!bestMatch || bestDiff > delta * MATCH_TOLERANCE) return;
 
         // Look up unit data from database
         var result = eng.scoreFromDashboardActions([bestMatch], state.waveNum, 99999);
@@ -436,8 +447,9 @@
     function fetchScoutingData(playerName, playerNum) {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', SCOUT_API + encodeURIComponent(playerName) + '?_=' + Date.now(), true);
-        xhr.timeout = 8000;
+        xhr.timeout = XHR_TIMEOUT_MS;
         xhr.onload = function () {
+            if (!state.scoutingPlayers[playerNum]) return;
             if (xhr.status === 200) {
                 try {
                     var data = JSON.parse(xhr.responseText);
@@ -446,18 +458,20 @@
                 } catch (e) {
                     state.scoutingPlayers[playerNum].error = true;
                     state.scoutingPlayers[playerNum].loading = false;
+                    console.warn('[SmartOverlay] Failed to parse scouting data for "' + playerName + '"');
                 }
             } else {
                 state.scoutingPlayers[playerNum].error = true;
                 state.scoutingPlayers[playerNum].loading = false;
+                console.warn('[SmartOverlay] Scouting API returned ' + xhr.status + ' for "' + playerName + '"');
             }
             scheduleRender();
         };
         xhr.onerror = xhr.ontimeout = function () {
-            if (state.scoutingPlayers[playerNum]) {
-                state.scoutingPlayers[playerNum].error = true;
-                state.scoutingPlayers[playerNum].loading = false;
-            }
+            if (!state.scoutingPlayers[playerNum]) return;
+            state.scoutingPlayers[playerNum].error = true;
+            state.scoutingPlayers[playerNum].loading = false;
+            console.warn('[SmartOverlay] Scouting request failed for "' + playerName + '"');
             scheduleRender();
         };
         xhr.send();
@@ -516,7 +530,9 @@
                 }
             } catch (e) { /* ignore parse errors */ }
         };
-        xhr.onerror = xhr.ontimeout = function () { /* silent fail */ };
+        xhr.onerror = xhr.ontimeout = function () {
+            console.warn('[SmartOverlay] Update check failed');
+        };
         xhr.send();
     }
 
@@ -611,8 +627,8 @@
 
         document.addEventListener('mousemove', function (e) {
             if (!dragTarget) return;
-            var x = Math.max(0, Math.min(window.innerWidth - 100, e.clientX - dragOffsetX));
-            var y = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - dragOffsetY));
+            var x = Math.max(0, Math.min(window.innerWidth - DRAG_MARGIN_X, e.clientX - dragOffsetX));
+            var y = Math.max(0, Math.min(window.innerHeight - DRAG_MARGIN_Y, e.clientY - dragOffsetY));
             dragTarget.style.left = x + 'px';
             dragTarget.style.top = y + 'px';
             dragTarget.style.right = 'auto';
@@ -688,10 +704,7 @@
         masterShortcutMap = {};
         actionContainersLogged = false;
         // Remove any live badges from DOM
-        var old = document.getElementsByClassName('so-hotkey-badge');
-        while (old.length > 0) {
-            old[0].parentNode.removeChild(old[0]);
-        }
+        removeAllByClass('so-hotkey-badge');
         clearTopPickHighlights();
         state.topFighterIcons = [];
     }
@@ -799,10 +812,7 @@
     }
 
     function clearTopPickHighlights() {
-        var old = document.getElementsByClassName('so-top-pick');
-        while (old.length > 0) {
-            old[0].parentNode.removeChild(old[0]);
-        }
+        removeAllByClass('so-top-pick');
         // Remove badge color classes
         var goldBadges = document.getElementsByClassName('so-hotkey-gold');
         while (goldBadges.length > 0) {
@@ -1156,9 +1166,10 @@
 
                 // Value and types roughly equal weight
                 var combined = typeScore + valueScore * 1.0;
+                var threshold = (eng && eng.STRENGTH_THRESHOLD) || 0.04;
                 var rec = 'NEUTRAL';
-                if (combined > 0.04) rec = 'STRONG';
-                else if (combined < -0.04) rec = 'WEAK';
+                if (combined > threshold) rec = 'STRONG';
+                else if (combined < -threshold) rec = 'WEAK';
                 defStrength = {
                     recommendation: rec,
                     combined: combined,
@@ -1443,7 +1454,7 @@
         if (!match) return { cls: '', label: deltaStr };
         var diff = parseInt(match[1], 10);
         var label = diff > 0 ? '+' + diff : '' + diff;
-        if (diff >= -20 && diff <= 20) {
+        if (diff >= -VALUE_OK_THRESHOLD && diff <= VALUE_OK_THRESHOLD) {
             return { cls: 'mo-val-ok', label: diff === 0 ? 'On track' : label };
         }
         var cls = diff < 0 ? 'mo-val-low' : 'mo-val-high';

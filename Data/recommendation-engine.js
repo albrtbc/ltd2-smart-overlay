@@ -25,6 +25,13 @@ var SmartOverlayEngine = (function () {
         tierRelevance:       5    // Penalty for over/under-tiered units
     };
 
+    // Score normalization: maps multiplier range [0.75, 1.25] to [0, 100]
+    var SCORE_BASE = 0.75;
+    var SCORE_RANGE = 0.50;
+
+    // Threshold for STRONG/WEAK classification
+    var STRENGTH_THRESHOLD = 0.04;
+
     // Approximate tier-to-wave mapping
     var TIER_WAVE_MAP = {
         'Tier-1': { min: 1,  max: 5  },
@@ -86,12 +93,10 @@ var SmartOverlayEngine = (function () {
         var defScore = 2.0 - defMult; // Invert: 0.80 -> 1.20 (good), 1.20 -> 0.80 (bad)
 
         // Offensive type match score (0-100 scale)
-        var offensiveScore = ((offMult - 0.75) / 0.50) * 100;
-        offensiveScore = clamp(offensiveScore, 0, 100);
+        var offensiveScore = normalizeScore(offMult);
 
         // Defensive type match score (0-100 scale)
-        var defensiveScore = ((defScore - 0.75) / 0.50) * 100;
-        defensiveScore = clamp(defensiveScore, 0, 100);
+        var defensiveScore = normalizeScore(defScore);
 
         // Gold efficiency: DPS per gold (normalized)
         var dps = parseFloat(unit.dps) || 0;
@@ -224,6 +229,10 @@ var SmartOverlayEngine = (function () {
         return Math.max(min, Math.min(max, val));
     }
 
+    function normalizeScore(mult) {
+        return clamp(((mult - SCORE_BASE) / SCORE_RANGE) * 100, 0, 100);
+    }
+
     /**
      * Derives a role string from unit stats (HP/DPS ratio).
      * Used as fallback when the action object doesn't include a role.
@@ -344,11 +353,9 @@ var SmartOverlayEngine = (function () {
                 var defMult = getDamageMultiplier(wave.dmgType, dbUnit.armorType);
                 var defScore = 2.0 - defMult;
 
-                var offensiveScore = ((offMult - 0.75) / 0.50) * 100;
-                offensiveScore = clamp(offensiveScore, 0, 100);
+                var offensiveScore = normalizeScore(offMult);
 
-                var defensiveScore = ((defScore - 0.75) / 0.50) * 100;
-                defensiveScore = clamp(defensiveScore, 0, 100);
+                var defensiveScore = normalizeScore(defScore);
 
                 var dps = parseFloat(dbUnit.dps) || 0;
                 var cost = parseInt(dbUnit.goldCost, 10) || action.goldCost || 0;
@@ -549,10 +556,8 @@ var SmartOverlayEngine = (function () {
                 var survivalMult = 2.0 - avgDefMult;
 
                 // Combine: 60% offense (how much damage merc deals), 40% survival
-                var offScore = ((avgOffMult - 0.75) / 0.50) * 100;
-                offScore = clamp(offScore, 0, 100);
-                var defScore = ((survivalMult - 0.75) / 0.50) * 100;
-                defScore = clamp(defScore, 0, 100);
+                var offScore = normalizeScore(avgOffMult);
+                var defScore = normalizeScore(survivalMult);
 
                 var totalScore = offScore * 0.6 + defScore * 0.4;
 
@@ -777,7 +782,8 @@ var SmartOverlayEngine = (function () {
         getDamageMultiplier: getDamageMultiplier,
         multiplierToPercent: multiplierToPercent,
         multiplierClass: multiplierClass,
-        DAMAGE_MATRIX: DAMAGE_MATRIX
+        DAMAGE_MATRIX: DAMAGE_MATRIX,
+        STRENGTH_THRESHOLD: STRENGTH_THRESHOLD
     };
 })();
 

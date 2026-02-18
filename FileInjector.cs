@@ -13,6 +13,7 @@ namespace LTD2SmartOverlay
     {
         private const string GatewayFileName = "gateway.html";
         private const string ScriptInjectionMarker = "<!-- LTD2SmartOverlay -->";
+        private const string BackupExtension = ".smartoverlay-backup";
 
         private static readonly string[] EmbeddedResources = new[]
         {
@@ -74,8 +75,15 @@ namespace LTD2SmartOverlay
                     using (var reader = new StreamReader(stream))
                     {
                         var content = reader.ReadToEnd();
-                        File.WriteAllText(targetPath, content);
-                        _injectedFiles.Add(targetPath);
+                        try
+                        {
+                            File.WriteAllText(targetPath, content);
+                            _injectedFiles.Add(targetPath);
+                        }
+                        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                        {
+                            Plugin.Log.LogError($"Failed to write {targetPath}: {ex.Message}");
+                        }
                     }
                 }
             }
@@ -90,7 +98,16 @@ namespace LTD2SmartOverlay
                 return;
             }
 
-            var content = File.ReadAllText(gatewayPath);
+            string content;
+            try
+            {
+                content = File.ReadAllText(gatewayPath);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Plugin.Log.LogError($"Failed to read gateway: {ex.Message}");
+                return;
+            }
 
             if (content.Contains(ScriptInjectionMarker))
             {
@@ -99,10 +116,18 @@ namespace LTD2SmartOverlay
             }
 
             // Backup original
-            _gatewayBackupPath = gatewayPath + ".smartoverlay-backup";
+            _gatewayBackupPath = gatewayPath + BackupExtension;
             if (!File.Exists(_gatewayBackupPath))
             {
-                File.Copy(gatewayPath, _gatewayBackupPath, false);
+                try
+                {
+                    File.Copy(gatewayPath, _gatewayBackupPath, false);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    Plugin.Log.LogError($"Failed to backup gateway: {ex.Message}");
+                    return;
+                }
             }
 
             var scriptTags = BuildScriptTags();
@@ -117,7 +142,15 @@ namespace LTD2SmartOverlay
             }
 
             content = content.Insert(insertIndex, injection);
-            File.WriteAllText(gatewayPath, content);
+            try
+            {
+                File.WriteAllText(gatewayPath, content);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Plugin.Log.LogError($"Failed to write patched gateway: {ex.Message}");
+                return;
+            }
             Plugin.Log.LogInfo("Gateway patched with overlay scripts.");
         }
 
@@ -140,16 +173,30 @@ namespace LTD2SmartOverlay
                 return;
 
             var gatewayPath = Path.Combine(_uiResourcesPath, GatewayFileName);
-            File.Delete(gatewayPath);
-            File.Move(_gatewayBackupPath, gatewayPath);
+            try
+            {
+                File.Delete(gatewayPath);
+                File.Move(_gatewayBackupPath, gatewayPath);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Plugin.Log.LogError($"Failed to restore gateway: {ex.Message}");
+            }
         }
 
         private void RemoveInjectedFiles()
         {
             foreach (var file in _injectedFiles)
             {
-                if (File.Exists(file))
-                    File.Delete(file);
+                try
+                {
+                    if (File.Exists(file))
+                        File.Delete(file);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    Plugin.Log.LogWarning($"Failed to remove {file}: {ex.Message}");
+                }
             }
             _injectedFiles.Clear();
         }
