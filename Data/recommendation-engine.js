@@ -16,21 +16,34 @@ var SmartOverlayEngine = (function () {
         Pure:      { Fortified: 1.00, Natural: 1.00, Immaterial: 1.00, Arcane: 1.00, Swift: 1.00 }
     };
 
-    // Scoring weights (tunable)
+    // Scoring weights for fighter advisor (must sum to 100)
     var WEIGHTS = {
-        offensiveTypeMatch: 35,   // How well your unit's attack counters the wave's defense
-        defensiveTypeMatch: 25,   // How well your unit's armor resists the wave's attack
-        goldEfficiency:     20,   // DPS per gold spent
+        offensiveTypeMatch: 30,   // How well your unit's attack counters the wave's defense
+        defensiveTypeMatch: 22,   // How well your unit's armor resists the wave's attack
+        goldEfficiency:     15,   // DPS per gold spent
+        hpEfficiency:       10,   // HP per gold — tankiness matters
         upgradeBonus:       15,   // Bonus if upgrading an existing unit
-        tierRelevance:       5    // Penalty for over/under-tiered units
+        tierRelevance:       8    // Penalty for over/under-tiered units
     };
 
     // Score normalization: maps multiplier range [0.75, 1.25] to [0, 100]
     var SCORE_BASE = 0.75;
     var SCORE_RANGE = 0.50;
 
+    // Multi-wave lookahead weights (current wave, next, next+1)
+    var WAVE_LOOKAHEAD = [0.60, 0.25, 0.15];
+
     // Threshold for STRONG/WEAK classification
     var STRENGTH_THRESHOLD = 0.04;
+
+    // Push/hold tuning
+    var PUSH_TYPE_WEIGHT = 0.35;
+    var PUSH_VALUE_WEIGHT = 0.50;
+    var PUSH_WAVE_WEIGHT = 0.15;
+    var PUSH_MYTHIUM_MIN = 40;
+
+    // Merc synergy bonus when attack type matches wave
+    var MERC_SYNERGY_BONUS = 15;
 
     // Approximate tier-to-wave mapping
     var TIER_WAVE_MAP = {
@@ -337,6 +350,17 @@ var SmartOverlayEngine = (function () {
             return { wave: null, recommendations: [], totalScored: 0 };
         }
 
+        // Multi-wave lookahead: gather current + next 2 waves
+        var lookaheadWaves = [wave];
+        for (var lw = 1; lw < WAVE_LOOKAHEAD.length; lw++) {
+            var futureWave = findWave(effectiveWave + lw);
+            if (futureWave) lookaheadWaves.push(futureWave);
+        }
+        var totalLookaheadWeight = 0;
+        for (var ww = 0; ww < lookaheadWaves.length; ww++) {
+            totalLookaheadWeight += WAVE_LOOKAHEAD[ww];
+        }
+
         var iconLookup = buildIconLookup();
         var scored = [];
 
@@ -348,35 +372,56 @@ var SmartOverlayEngine = (function () {
             var shortcut = extractShortcutFromHeader(action.header);
 
             if (dbUnit) {
-                // Score against wave using existing logic
-                var offMult = getDamageMultiplier(dbUnit.attackType, wave.defType);
-                var defMult = getDamageMultiplier(wave.dmgType, dbUnit.armorType);
-                var defScore = 2.0 - defMult;
+                // Blended offensive/defensive scores across current + future waves
+                var blendedOff = 0;
+                var blendedDef = 0;
+                for (var wi = 0; wi < lookaheadWaves.length; wi++) {
+                    var lWave = lookaheadWaves[wi];
+                    var wOffMult = getDamageMultiplier(dbUnit.attackType, lWave.defType);
+                    var wDefMult = getDamageMultiplier(lWave.dmgType, dbUnit.armorType);
+                    var wDefScore = 2.0 - wDefMult;
+                    var w = WAVE_LOOKAHEAD[wi] / totalLookaheadWeight;
+                    blendedOff += normalizeScore(wOffMult) * w;
+                    blendedDef += normalizeScore(wDefScore) * w;
+                }
 
-                var offensiveScore = normalizeScore(offMult);
-
-                var defensiveScore = normalizeScore(defScore);
+                // Display multipliers: current wave only
+                var displayOffMult = getDamageMultiplier(dbUnit.attackType, wave.defType);
+                var displayDefMult = getDamageMultiplier(wave.dmgType, dbUnit.armorType);
 
                 var dps = parseFloat(dbUnit.dps) || 0;
+                var hp = parseFloat(dbUnit.hp) || 0;
                 var cost = parseInt(dbUnit.goldCost, 10) || action.goldCost || 0;
+
+                // Gold efficiency: DPS per gold (normalized)
                 var goldEff = cost > 0 ? (dps / cost) * 100 : 0;
                 goldEff = clamp(goldEff, 0, 100);
 
+                // HP efficiency: tankiness per gold
+                var hpEff = cost > 0 ? (hp / cost) * 5 : 0;
+                hpEff = clamp(hpEff, 0, 100);
+
                 var tierScore = scoreTierRelevance(dbUnit.infoTier, effectiveWave);
 
+                // Upgrade detection: game shows "Upgrade" in header for upgrades
+                var isUpgrade = !!(action.header && /upgrade/i.test(action.header));
+                var upgradeScore = isUpgrade ? 100 : 0;
+
                 var totalScore =
-                    (offensiveScore * WEIGHTS.offensiveTypeMatch +
-                     defensiveScore * WEIGHTS.defensiveTypeMatch +
-                     goldEff        * WEIGHTS.goldEfficiency +
-                     tierScore      * WEIGHTS.tierRelevance) / 100;
+                    (blendedOff  * WEIGHTS.offensiveTypeMatch +
+                     blendedDef  * WEIGHTS.defensiveTypeMatch +
+                     goldEff     * WEIGHTS.goldEfficiency +
+                     hpEff       * WEIGHTS.hpEfficiency +
+                     upgradeScore * WEIGHTS.upgradeBonus +
+                     tierScore   * WEIGHTS.tierRelevance) / 100;
 
                 scored.push({
                     unit: dbUnit,
                     totalScore: Math.round(totalScore * 10) / 10,
-                    offensiveMultiplier: offMult,
-                    defensiveMultiplier: defMult,
+                    offensiveMultiplier: displayOffMult,
+                    defensiveMultiplier: displayDefMult,
                     goldEfficiency: Math.round(goldEff * 10) / 10,
-                    isUpgrade: false,
+                    isUpgrade: isUpgrade,
                     cost: action.goldCost || cost,
                     grayedOut: !!action.grayedOut,
                     role: action.role || computeRole(dbUnit),
@@ -458,7 +503,7 @@ var SmartOverlayEngine = (function () {
             if (dbUnit) {
                 var armor = dbUnit.armorType || 'Unknown';
                 var attack = dbUnit.attackType || 'Unknown';
-                var goldVal = parseInt(dbUnit.goldCost, 10) || 50;
+                var goldVal = parseInt(dbUnit.totalValue, 10) || parseInt(dbUnit.goldCost, 10) || 50;
 
                 defBreakdown[armor] = (defBreakdown[armor] || 0) + 1;
                 atkBreakdown[attack] = (atkBreakdown[attack] || 0) + 1;
@@ -489,7 +534,13 @@ var SmartOverlayEngine = (function () {
      * @param {number} mythium - Player's current mythium.
      * @returns {Object} { defenseBreakdown, totalFighters, recommendations[] }
      */
-    function scoreMercenaries(actions, defenderGrid, mythium) {
+    /**
+     * @param {Array}  actions - Windshield actions (mercenary bar).
+     * @param {Array}  defenderGrid - Cached grid array from defender's scoreboard data.
+     * @param {number} mythium - Player's current mythium.
+     * @param {number} [waveNum] - Current wave number (for wave synergy scoring).
+     */
+    function scoreMercenaries(actions, defenderGrid, mythium, waveNum) {
         var result = {
             defenseBreakdown: {},
             attackBreakdown: {},
@@ -510,6 +561,9 @@ var SmartOverlayEngine = (function () {
         result.attackValue = analysis.attackValue;
         result.totalFighters = analysis.totalFighters;
         result.totalValue = analysis.totalValue;
+
+        // Look up current wave for synergy scoring
+        var wave = waveNum ? findWave(waveNum) : null;
 
         var iconLookup = buildIconLookup();
         var scored = [];
@@ -552,20 +606,37 @@ var SmartOverlayEngine = (function () {
                     defWeight += atkGold;
                 }
                 var avgDefMult = defWeight > 0 ? defTotal / defWeight : 1.0;
-                // Invert: lower damage taken = better survival
                 var survivalMult = 2.0 - avgDefMult;
 
-                // Combine: 60% offense (how much damage merc deals), 40% survival
+                // Base type matchup (0-75 range)
                 var offScore = normalizeScore(avgOffMult);
                 var defScore = normalizeScore(survivalMult);
+                var baseScore = offScore * 0.50 + defScore * 0.25;
 
-                var totalScore = offScore * 0.6 + defScore * 0.4;
+                // Wave synergy bonus (0-15): merc attack matches wave attack
+                // Forces opponent to stack one armor type for both wave + mercs
+                var synergy = 0;
+                if (wave && dbUnit.attackType === wave.dmgType) {
+                    synergy = MERC_SYNERGY_BONUS;
+                }
+
+                // DPS factor (0-10): reward high-burst mercs
+                var mercDps = parseFloat(dbUnit.dps) || 0;
+                var dpsBonusVal = clamp(mercDps / 20, 0, 10);
+
+                var totalScore = baseScore + synergy + dpsBonusVal;
+
+                // Mythium efficiency: slight boost for cost-effective mercs
+                if (cost > 0 && mercDps > 0) {
+                    totalScore += clamp((mercDps / cost) * 3, 0, 5);
+                }
 
                 scored.push({
                     unit: dbUnit,
                     totalScore: Math.round(totalScore * 10) / 10,
                     avgOffMult: avgOffMult,
                     avgDefMult: avgDefMult,
+                    hasSynergy: synergy > 0,
                     cost: cost,
                     grayedOut: !!action.grayedOut,
                     canAfford: canAfford,
@@ -589,6 +660,7 @@ var SmartOverlayEngine = (function () {
                     totalScore: 0,
                     avgOffMult: 1.0,
                     avgDefMult: 1.0,
+                    hasSynergy: false,
                     cost: cost,
                     grayedOut: !!action.grayedOut,
                     canAfford: canAfford,
@@ -625,10 +697,31 @@ var SmartOverlayEngine = (function () {
      * @param {Object} attackValue - Opponent attack types keyed by gold value.
      * @returns {Object|null} { recommendation, score, waveOffAvg, oppKillAvg, waveName, waveDmgType, waveDefType }
      */
-    function evaluatePushHold(waveNum, defenseValue, attackValue) {
+    /**
+     * @param {number} waveNum - Current wave number.
+     * @param {Object} defenseValue - Opponent armor types keyed by gold value.
+     * @param {Object} attackValue - Opponent attack types keyed by gold value.
+     * @param {number} [opponentValueDelta] - Opponent value minus recommended (negative = under-built).
+     * @param {number} [mythium] - Player's current mythium.
+     */
+    function evaluatePushHold(waveNum, defenseValue, attackValue, opponentValueDelta, mythium) {
         var wave = findWave(waveNum);
         if (!wave) return null;
 
+        // Mythium threshold: if below minimum, always HOLD (not enough to send meaningfully)
+        if (mythium !== undefined && mythium > 0 && mythium < PUSH_MYTHIUM_MIN) {
+            return {
+                recommendation: 'HOLD',
+                score: -0.5,
+                waveOffAvg: 1.0,
+                oppKillAvg: 1.0,
+                waveName: wave.name,
+                waveDmgType: wave.dmgType,
+                waveDefType: wave.defType
+            };
+        }
+
+        // --- Type matchup score ---
         // How well does this wave's attack threaten the opponent's army?
         var waveOffTotal = 0, waveOffWeight = 0;
         for (var defType in defenseValue) {
@@ -651,8 +744,39 @@ var SmartOverlayEngine = (function () {
         }
         var oppKillAvg = oppKillWeight > 0 ? oppKillTotal / oppKillWeight : 1.0;
 
-        // Score > 0 = PUSH, Score < 0 = HOLD
-        var pushScore = (waveOffAvg - 1.0) - (oppKillAvg - 1.0);
+        var typeScore = (waveOffAvg - 1.0) - (oppKillAvg - 1.0);
+
+        // --- Value delta signal ---
+        // If opponent is below recommended value, it's a good time to push
+        var valueDeltaScore = 0;
+        if (opponentValueDelta !== undefined && opponentValueDelta !== 0) {
+            // Negative delta (opponent under-built) → positive push signal
+            // -100g → +0.2 push, +100g → -0.2 hold
+            valueDeltaScore = clamp(-opponentValueDelta / 500, -0.3, 0.3);
+        }
+
+        // --- Wave difficulty scaling ---
+        // Later waves are harder to leak on; early waves are prime push windows
+        var wavePenalty = 0;
+        if (waveNum >= 15) {
+            wavePenalty = (waveNum - 14) * 0.03;
+        } else if (waveNum <= 8) {
+            // Slight push bonus for early waves (easier to leak)
+            wavePenalty = -(8 - waveNum) * 0.01;
+        }
+
+        // --- Combined score ---
+        var hasValueData = opponentValueDelta !== undefined && opponentValueDelta !== 0;
+        var pushScore;
+        if (hasValueData) {
+            // Full formula with value data
+            pushScore = typeScore * PUSH_TYPE_WEIGHT +
+                        valueDeltaScore * PUSH_VALUE_WEIGHT -
+                        wavePenalty * PUSH_WAVE_WEIGHT;
+        } else {
+            // Fallback: type matchup + wave difficulty only
+            pushScore = typeScore - wavePenalty * 0.3;
+        }
 
         return {
             recommendation: pushScore >= 0 ? 'PUSH' : 'HOLD',
@@ -755,13 +879,22 @@ var SmartOverlayEngine = (function () {
         }
         var waveDmgAvg = waveDmgWeight > 0 ? waveDmgTotal / waveDmgWeight : 1.0;
 
-        // positive = STRONG, negative = WEAK
-        // Weight offense more — killing the wave fast matters most
-        var defenseScore = (ourOffAvg - 1.0) * 0.7 - (waveDmgAvg - 1.0) * 0.3;
+        // Wave-count-aware weighting:
+        // High-count swarm waves (12+) stress defenses more → increase defense weight
+        // Low-count boss waves (1-4) require fast killing → increase offense weight
+        var amount = parseInt(wave.amount, 10) || 6;
+        var offWeight = amount <= 4 ? 0.80 : (amount >= 14 ? 0.55 : 0.80 - (amount - 4) * 0.025);
+        var defWeight = 1.0 - offWeight;
+
+        var defenseScore = (ourOffAvg - 1.0) * offWeight - (waveDmgAvg - 1.0) * defWeight;
+
+        // Compute a percentage for granular display
+        var pct = Math.round(defenseScore * 100);
 
         return {
             recommendation: defenseScore >= 0 ? 'STRONG' : 'WEAK',
             score: defenseScore,
+            pct: pct,
             ourOffAvg: ourOffAvg,
             waveDmgAvg: waveDmgAvg,
             waveName: wave.name,

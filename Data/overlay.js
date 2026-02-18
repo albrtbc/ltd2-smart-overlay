@@ -1162,6 +1162,8 @@
                 var valueScore = 0;
                 if (state.recommendedValue > 0 && state.currentValue > 0) {
                     valueScore = (state.currentValue - state.recommendedValue) / state.recommendedValue;
+                    // Clamp to prevent extreme distortion from leaks/overinvest
+                    valueScore = Math.max(-0.3, Math.min(0.3, valueScore));
                 }
 
                 // Value and types roughly equal weight
@@ -1170,10 +1172,15 @@
                 var rec = 'NEUTRAL';
                 if (combined > threshold) rec = 'STRONG';
                 else if (combined < -threshold) rec = 'WEAK';
+
+                // Granular percentage for display
+                var typePct = typeResult.pct || Math.round(typeScore * 100);
+
                 defStrength = {
                     recommendation: rec,
                     combined: combined,
                     typeScore: typeScore,
+                    typePct: typePct,
                     valueScore: valueScore,
                     waveDmgType: typeResult.waveDmgType,
                     waveDefType: typeResult.waveDefType
@@ -1277,13 +1284,18 @@
         if (ds.recommendation === 'STRONG') cls = 'so-ds-strong';
         else if (ds.recommendation === 'WEAK') cls = 'so-ds-weak';
 
+        var pctStr = '';
+        if (ds.typePct !== undefined && ds.typePct !== 0) {
+            pctStr = ds.typePct > 0 ? ' +' + ds.typePct + '%' : ' ' + ds.typePct + '%';
+        }
+
         var detail = '';
         if (ds.recommendation === 'STRONG') {
-            detail = 'Good vs ' + ds.waveDefType + ' wave';
+            detail = 'Good vs ' + ds.waveDefType + ' wave' + pctStr;
         } else if (ds.recommendation === 'WEAK') {
-            detail = 'Weak vs ' + ds.waveDmgType + ' wave';
+            detail = 'Weak vs ' + ds.waveDmgType + ' wave' + pctStr;
         } else {
-            detail = 'Balanced matchup';
+            detail = 'Balanced matchup' + pctStr;
         }
 
         return '<div class="so-defense-strength ' + cls + '">' +
@@ -1377,14 +1389,24 @@
         var result = eng.scoreMercenaries(
             state.windshieldActions,
             state.defenderGrid,
-            state.mythium
+            state.mythium,
+            state.waveNum
         );
 
         // Evaluate PUSH/HOLD forecast for current wave + next 4
         var pushForecast = [];
         if (state.showPushForecast && eng.evaluatePushHold && result.totalFighters > 0) {
+            // Parse opponent value delta for push/hold signal
+            var oppDelta = undefined;
+            if (state.defenderValueDelta) {
+                var deltaMatch = state.defenderValueDelta.match(/\(([+-]?\d+)\)/);
+                if (deltaMatch) oppDelta = parseInt(deltaMatch[1], 10);
+            }
             for (var fw = state.waveNum; fw < state.waveNum + 5; fw++) {
-                var ph = eng.evaluatePushHold(fw, result.defenseValue, result.attackValue);
+                var ph = eng.evaluatePushHold(
+                    fw, result.defenseValue, result.attackValue,
+                    oppDelta, state.mythium
+                );
                 if (ph) {
                     ph.waveNum = fw;
                     pushForecast.push(ph);
