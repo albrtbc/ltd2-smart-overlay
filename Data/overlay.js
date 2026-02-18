@@ -274,7 +274,7 @@
     }
 
     // =========================================================================
-    //  Scouting — extract player names from scoreboard
+    //  Scouting — extract player names from scoreboard & loading stickers
     // =========================================================================
 
     function isBotName(name) {
@@ -283,9 +283,119 @@
         return /\b(bot|ai)\b/.test(plain);
     }
 
+    var scoutingDumped = false;
+
+    // --- Loading sticker capture (early opponent detection) ---
+    var loadingStickerPlayers = []; // [{slot, name}]
+    var myTeamDetected = 0; // 0 = unknown, 1 = team1 (slots 1-4), 2 = team2 (slots 5-8)
+
+    /**
+     * Add a single player to scouting if not already known.
+     * Returns true if the player was added.
+     */
+    function addScoutingPlayer(name, isAlly) {
+        if (!name || !state.showScouting || state.isBotGame) return false;
+        var plainName = name.replace(/<[^>]+>/g, '').trim();
+        if (!plainName) return false;
+
+        // Check if already known
+        for (var key in state.scoutingPlayers) {
+            if (state.scoutingPlayers.hasOwnProperty(key) &&
+                state.scoutingPlayers[key].name === plainName) {
+                return false;
+            }
+        }
+
+        // Find next index
+        var nextIdx = 0;
+        for (var k in state.scoutingPlayers) {
+            if (state.scoutingPlayers.hasOwnProperty(k)) {
+                var n = parseInt(k, 10);
+                if (n > nextIdx) nextIdx = n;
+            }
+        }
+        nextIdx++;
+
+        state.scoutingPlayers[nextIdx] = {
+            name: plainName, isAlly: isAlly,
+            data: null, loading: true, error: null
+        };
+        fetchScoutingData(plainName, nextIdx);
+
+        if (!state.scoutingVisible) {
+            state.scoutingVisible = true;
+        }
+        console.log('[SmartOverlay] Scouting: added ' + (isAlly ? 'ally' : 'opponent') +
+            ' "' + plainName + '"');
+        scheduleRender();
+        return true;
+    }
+
+    /**
+     * Capture a loading sticker event and determine ally/opponent by slot.
+     * Slots 1-4 = Team 1 (West), slots 5-8 = Team 2 (East).
+     */
+    function captureFromLoadingSticker(slot, displayName) {
+        if (!displayName || displayName === '_closed' || displayName === '_open' ||
+            displayName === '(Closed)') return;
+
+        // Avoid duplicates in our buffer
+        for (var i = 0; i < loadingStickerPlayers.length; i++) {
+            if (loadingStickerPlayers[i].name === displayName) return;
+        }
+        loadingStickerPlayers.push({ slot: slot, name: displayName });
+        processLoadingStickers();
+    }
+
+    /**
+     * Once we know our team, classify all buffered loading sticker players.
+     */
+    function processLoadingStickers() {
+        if (loadingStickerPlayers.length === 0) return;
+        if (!state.showScouting || state.isBotGame) return;
+
+        // Determine our username
+        var myName = '';
+        if (typeof globalState !== 'undefined' && globalState.savedUsername) {
+            myName = globalState.savedUsername;
+        }
+        if (!myName) return;
+
+        // Detect our team from our own slot
+        if (myTeamDetected === 0) {
+            for (var i = 0; i < loadingStickerPlayers.length; i++) {
+                if (loadingStickerPlayers[i].name === myName) {
+                    myTeamDetected = (loadingStickerPlayers[i].slot <= 4) ? 1 : 2;
+                    break;
+                }
+            }
+        }
+        if (myTeamDetected === 0) return; // still can't determine team
+
+        var myMin = (myTeamDetected === 1) ? 1 : 5;
+        var myMax = (myTeamDetected === 1) ? 4 : 8;
+
+        for (var j = 0; j < loadingStickerPlayers.length; j++) {
+            var sp = loadingStickerPlayers[j];
+            var isAlly = (sp.slot >= myMin && sp.slot <= myMax);
+            addScoutingPlayer(sp.name, isAlly);
+        }
+    }
+
     function captureScoutingFromScoreboard(players) {
         if (!players || !players.length) return;
         if (!state.showScouting) return;
+
+        // Dump first scoreboard data for debugging
+        if (!scoutingDumped) {
+            scoutingDumped = true;
+            for (var d = 0; d < players.length; d++) {
+                console.log('[SmartOverlay] Scoreboard player[' + d + ']: ' +
+                    JSON.stringify(Object.keys(players[d])) +
+                    ' name=' + (players[d].name || '') +
+                    ' defender=' + (players[d].defenderPlayerName || ''));
+            }
+        }
 
         // Detect bot game: check if all opponents are bots
         if (!state.isBotGame) {
@@ -310,49 +420,12 @@
             return;
         }
 
-        // Collect already-known names
-        var seen = {};
-        var nextIdx = 0;
-        for (var key in state.scoutingPlayers) {
-            if (state.scoutingPlayers.hasOwnProperty(key)) {
-                seen[state.scoutingPlayers[key].name] = true;
-                var n = parseInt(key, 10);
-                if (n > nextIdx) nextIdx = n;
-            }
-        }
-
-        var added = 0;
-
         // Players in the scoreboard array are allies (including me).
         // Their defenderPlayerName fields are the opponents.
         for (var i = 0; i < players.length; i++) {
             var p = players[i];
-            if (p.name && !seen[p.name]) {
-                seen[p.name] = true;
-                nextIdx++;
-                state.scoutingPlayers[nextIdx] = {
-                    name: p.name, isAlly: true,
-                    data: null, loading: true, error: null
-                };
-                fetchScoutingData(p.name, nextIdx);
-                added++;
-            }
-            if (p.defenderPlayerName && !seen[p.defenderPlayerName]) {
-                seen[p.defenderPlayerName] = true;
-                nextIdx++;
-                state.scoutingPlayers[nextIdx] = {
-                    name: p.defenderPlayerName, isAlly: false,
-                    data: null, loading: true, error: null
-                };
-                fetchScoutingData(p.defenderPlayerName, nextIdx);
-                added++;
-            }
-        }
-
-        if (added > 0) {
-            state.scoutingVisible = true;
-            console.log('[SmartOverlay] Scouting: added ' + added + ' players (total: ' + nextIdx + ').');
-            scheduleRender();
+            if (p.name) addScoutingPlayer(p.name, true);
+            if (p.defenderPlayerName) addScoutingPlayer(p.defenderPlayerName, false);
         }
     }
 
@@ -820,6 +893,9 @@
                 state.isBotGame = false;
                 state.scoutingPlayers = {};
                 state.scoutingVisible = false;
+                loadingStickerPlayers = [];
+                myTeamDetected = 0;
+                scoutingDumped = false;
                 resetHotkeyBadges();
             }
             state.waveNum = waveNumber;
@@ -886,7 +962,50 @@
         engine.on('refreshWindshieldDefender', function (defenderName) {
             state.defenderName = defenderName || '';
             state.defenderNamePlain = (defenderName || '').replace(/<[^>]+>/g, '').trim();
+            // Add defender as opponent for scouting (early detection)
+            if (state.defenderNamePlain) {
+                addScoutingPlayer(state.defenderNamePlain, false);
+            }
             scheduleRender();
+        });
+
+        // --- Loading sticker events (early opponent detection during loading screen) ---
+        // The game sends loading sticker data for ALL players during loading.
+        // Slot 1-4 = Team 1 (West), Slot 5-8 = Team 2 (East).
+        engine.on('refreshLoadingSticker', function () {
+            var args = Array.prototype.slice.call(arguments);
+            console.log('[SmartOverlay] refreshLoadingSticker: ' + JSON.stringify(args));
+            // Expected: (slot, displayName, rating, country, guild, guildAvatar)
+            if (args.length >= 2 && typeof args[0] === 'number' && typeof args[1] === 'string') {
+                captureFromLoadingSticker(args[0], args[1]);
+            } else if (args.length >= 1 && typeof args[0] === 'object' && args[0] !== null) {
+                var obj = args[0];
+                captureFromLoadingSticker(
+                    obj.tmpPlayer || obj.slot || obj.playerSlot || 0,
+                    obj.displayName || obj.name || ''
+                );
+            }
+        });
+
+        // Versus overlay fires at game start with all matchup info
+        engine.on('showVersusOverlay', function () {
+            var args = Array.prototype.slice.call(arguments);
+            console.log('[SmartOverlay] showVersusOverlay: ' + JSON.stringify(args));
+            // Try to extract player names from versus info
+            if (args.length >= 1 && args[0] && typeof args[0].length === 'number') {
+                for (var v = 0; v < args[0].length; v++) {
+                    var info = args[0][v];
+                    if (!info) continue;
+                    // Try common property names for opponent
+                    var oppName = info.opponentName || info.defenderName || info.rightName ||
+                        info.enemyName || info.name2 || '';
+                    if (oppName) addScoutingPlayer(oppName, false);
+                    // Try common property names for ally
+                    var allyName = info.playerName || info.attackerName || info.leftName ||
+                        info.name1 || '';
+                    if (allyName) addScoutingPlayer(allyName, true);
+                }
+            }
         });
 
         // Track scoreboard open/close and enemy view toggle
@@ -1580,9 +1699,9 @@
 
     function renderScoutCard(player) {
         var html = '<div class="sc-player-card">';
-        var plainName = stripHtml(player.name) || '???';
+        var plainName = stripHtml(player.name);
+        if (!plainName) plainName = player.name || '???';
 
-        // Header: name as simple block div (Coherent GT flex bugs collapse spans)
         html += '<div class="sc-player-name">' + escapeHtml(plainName) + '</div>';
 
         if (player.loading) {
@@ -1722,16 +1841,16 @@
 
         html += renderToggleRow('showScouting', 'Scouting',
             'Fetch player stats (W/L, Elo, openers) from Drachbot API when the scoreboard opens.', false);
-        html += renderToggleRow('showHotkeyBadges', 'Hotkey Badges',
-            'Show keyboard shortcut labels on the game\'s unit, merc, and king action bars.', false);
+        html += renderToggleRow('showTopPicks', 'Top Picks Highlight',
+            'Highlight the top 3 recommended units on the game\'s purchase bar with glowing borders.', false);
+        html += renderToggleRow('showDefenseStrength', 'Defense Strength',
+            'Show the STRONG/NEUTRAL/WEAK indicator for your army vs the current wave.', false);
         html += renderToggleRow('showMercAdviser', 'Merc Adviser',
             'Show the merc advisor panel with opponent breakdown and merc recommendations.', false);
         html += renderToggleRow('showPushForecast', 'Push/Hold Forecast',
             'Show the 5-wave push/hold forecast inside the merc advisor panel.', true);
-        html += renderToggleRow('showDefenseStrength', 'Defense Strength',
-            'Show the STRONG/NEUTRAL/WEAK indicator for your army vs the current wave.', false);
-        html += renderToggleRow('showTopPicks', 'Top Picks Highlight',
-            'Highlight the top 3 recommended units on the game\'s purchase bar with glowing borders.', false);
+        html += renderToggleRow('showHotkeyBadges', 'Hotkey Badges',
+            'Show keyboard shortcut labels on the game\'s unit, merc, and king action bars.', false);
 
         html += '<div class="sg-reset-row">' +
             '<button id="sg-reset-btn" class="sg-reset-btn" tabindex="-1">Reset Layout</button>' +

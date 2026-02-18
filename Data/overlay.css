@@ -824,7 +824,11 @@
     font-size: 14px;
     font-weight: 600;
     color: #70e8e8;
-    margin-bottom: 3px;
+    line-height: 20px;
+    min-height: 20px;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(0, 200, 200, 0.15);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -844,7 +848,7 @@
     align-items: center;
     gap: 10px;
     font-size: 13px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 }
 
 .sc-loading {
@@ -1078,6 +1082,7 @@
     font-size: 11px;
     font-weight: 400;
     color: #667788;
+    margin-right: 4px;
 }
 
 .sg-toggle-btn {
