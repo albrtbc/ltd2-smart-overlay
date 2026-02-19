@@ -417,6 +417,9 @@
         if (!name || !state.showScouting || state.isBotGame) return false;
         var plainName = name.replace(/<[^>]+>/g, '').trim();
         if (!plainName) return false;
+        // Filter out game UI labels that aren't real player names
+        var lower = plainName.toLowerCase();
+        if (lower === 'the whole team' || lower === 'the entire team') return false;
 
         // Check if already known
         for (var key in state.scoutingPlayers) {
