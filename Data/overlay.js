@@ -83,11 +83,44 @@
         updateAvailable: null,   // {version, url} when a newer release exists
         updateDismissed: false,
         // Fighter wave navigation (0 = auto/current wave)
-        fighterViewWave: 0
+        fighterViewWave: 0,
+        // Settings tab & keybinding capture
+        settingsTab: 'options',
+        bindingCapture: null,
+        keybindings: {
+            wavePrev: { keyCode: 37, label: 'ArrowLeft' },
+            waveNext: { keyCode: 39, label: 'ArrowRight' }
+        }
     };
 
     var renderTimer = null;
     var topPickRetryTimer = null;
+
+    // --- KeyCode → display label (Coherent GT lacks e.key) ---
+    var KEY_LABELS = {
+        8: 'Backspace', 9: 'Tab', 13: 'Enter', 16: 'Shift', 17: 'Ctrl', 18: 'Alt',
+        19: 'Pause', 20: 'CapsLock', 27: 'Esc', 32: 'Space',
+        33: 'PageUp', 34: 'PageDn', 35: 'End', 36: 'Home',
+        37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown',
+        45: 'Insert', 46: 'Delete',
+        91: 'Meta', 93: 'Menu',
+        112: 'F1', 113: 'F2', 114: 'F3', 115: 'F4', 116: 'F5', 117: 'F6',
+        118: 'F7', 119: 'F8', 120: 'F9', 121: 'F10', 122: 'F11', 123: 'F12',
+        144: 'NumLock', 145: 'ScrollLock',
+        186: ';', 187: '=', 188: ',', 189: '-', 190: '.', 191: '/', 192: '`',
+        219: '[', 220: '\\', 221: ']', 222: "'"
+    };
+
+    function keyLabel(e) {
+        // e.key is reliable in modern browsers but absent in Coherent GT
+        if (e.key && e.key.length > 0 && e.key !== 'Unidentified') return e.key;
+        return KEY_LABELS[e.keyCode] || String.fromCharCode(e.keyCode);
+    }
+
+    var DEFAULT_KEYBINDINGS = {
+        wavePrev: { keyCode: 37, label: 'ArrowLeft' },
+        waveNext: { keyCode: 39, label: 'ArrowRight' }
+    };
 
     // --- Scoreboard view detection ---
     var scoreboardOpen = false;
@@ -678,6 +711,13 @@
                         state[k] = !!obj[k];
                     }
                 }
+                if (obj.keybindings) {
+                    for (var bk in obj.keybindings) {
+                        if (obj.keybindings.hasOwnProperty(bk) && state.keybindings.hasOwnProperty(bk)) {
+                            state.keybindings[bk] = obj.keybindings[bk];
+                        }
+                    }
+                }
             }
         } catch (e) { /* ignore */ }
     }
@@ -688,6 +728,7 @@
             for (var i = 0; i < SETTINGS_KEYS.length; i++) {
                 obj[SETTINGS_KEYS[i]] = state[SETTINGS_KEYS[i]];
             }
+            obj.keybindings = state.keybindings;
             localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(obj));
         } catch (e) { /* ignore */ }
     }
@@ -1156,14 +1197,28 @@
         });
 
         document.addEventListener('keydown', function (e) {
+            // Keybinding capture mode — next keypress assigns the binding
+            if (state.bindingCapture) {
+                state.keybindings[state.bindingCapture] = {
+                    keyCode: e.keyCode,
+                    label: keyLabel(e)
+                };
+                state.bindingCapture = null;
+                saveSettings();
+                renderSettings();
+                e.preventDefault();
+                return;
+            }
             // Space (keyCode 32) while scoreboard is open toggles enemy view
             if (scoreboardOpen && e.keyCode === 32) {
                 showingEnemies = !showingEnemies;
             }
-            // Left/Right arrows navigate fighter advisor wave
+            // Configurable wave navigation shortcuts
             if (state.inGame && state.fighterVisible && !state.fighterMinimized) {
-                if (e.keyCode === 37) navigateFighterWave(-1);      // Left arrow
-                else if (e.keyCode === 39) navigateFighterWave(1);  // Right arrow
+                var prevKey = state.keybindings.wavePrev.keyCode;
+                var nextKey = state.keybindings.waveNext.keyCode;
+                if (prevKey && e.keyCode === prevKey) navigateFighterWave(-1);
+                else if (nextKey && e.keyCode === nextKey) navigateFighterWave(1);
             }
         });
 
@@ -2023,22 +2078,39 @@
             '</span>' +
             '</div>';
 
-        html += renderToggleRow('showScouting', 'Scouting',
-            'Fetch player stats (W/L, Elo, openers) from Drachbot API when the scoreboard opens.', false);
-        html += renderToggleRow('showTopPicks', 'Top Picks Highlight',
-            'Highlight the top 3 recommended units on the game\'s purchase bar with glowing borders.', false);
-        html += renderToggleRow('showDefenseStrength', 'Defense Strength',
-            'Show the STRONG/NEUTRAL/WEAK indicator for your army vs the current wave.', false);
-        html += renderToggleRow('showMercAdviser', 'Merc Adviser',
-            'Show the merc advisor panel with opponent breakdown and merc recommendations.', false);
-        html += renderToggleRow('showPushForecast', 'Push/Hold',
-            'Show PUSH or HOLD recommendation for the current wave inside the merc advisor panel.', true);
-        html += renderToggleRow('showHotkeyBadges', 'Hotkey Badges',
-            'Show keyboard shortcut labels on the game\'s unit, merc, and king action bars.', false);
-
-        html += '<div class="sg-reset-row">' +
-            '<button id="sg-reset-btn" class="sg-reset-btn" tabindex="-1">Reset Layout</button>' +
+        // Tab bar
+        var optCls = 'sg-tab' + (state.settingsTab === 'options' ? ' sg-tab-active' : '');
+        var ctrlCls = 'sg-tab' + (state.settingsTab === 'controls' ? ' sg-tab-active' : '');
+        html += '<div class="sg-tab-bar">' +
+            '<button class="' + optCls + '" data-tab="options" tabindex="-1">Options</button>' +
+            '<button class="' + ctrlCls + '" data-tab="controls" tabindex="-1">Controls</button>' +
             '</div>';
+
+        if (state.settingsTab === 'controls') {
+            html += renderKeybindingRow('wavePrev', 'Previous Wave', 'Navigate to the previous wave in the fighter advisor.');
+            html += renderKeybindingRow('waveNext', 'Next Wave', 'Navigate to the next wave in the fighter advisor.');
+            html += '<div class="sg-keybind-hint">Left-click to rebind, right-click to clear</div>';
+            html += '<div class="sg-reset-row">' +
+                '<button id="sg-reset-controls-btn" class="sg-reset-btn" tabindex="-1">Reset Controls</button>' +
+                '</div>';
+        } else {
+            html += renderToggleRow('showScouting', 'Scouting',
+                'Fetch player stats (W/L, Elo, openers) from Drachbot API when the scoreboard opens.', false);
+            html += renderToggleRow('showTopPicks', 'Top Picks Highlight',
+                'Highlight the top 3 recommended units on the game\'s purchase bar with glowing borders.', false);
+            html += renderToggleRow('showDefenseStrength', 'Defense Strength',
+                'Show the STRONG/NEUTRAL/WEAK indicator for your army vs the current wave.', false);
+            html += renderToggleRow('showMercAdviser', 'Merc Adviser',
+                'Show the merc advisor panel with opponent breakdown and merc recommendations.', false);
+            html += renderToggleRow('showPushForecast', 'Push/Hold',
+                'Show PUSH or HOLD recommendation for the current wave inside the merc advisor panel.', true);
+            html += renderToggleRow('showHotkeyBadges', 'Hotkey Badges',
+                'Show keyboard shortcut labels on the game\'s unit, merc, and king action bars.', false);
+
+            html += '<div class="sg-reset-row">' +
+                '<button id="sg-reset-btn" class="sg-reset-btn" tabindex="-1">Reset Layout</button>' +
+                '</div>';
+        }
 
         root.innerHTML = html;
         bindSettingsEvents();
@@ -2069,6 +2141,24 @@
             '</div>';
     }
 
+    function renderKeybindingRow(bindKey, label, desc) {
+        var isCapturing = state.bindingCapture === bindKey;
+        var binding = state.keybindings[bindKey];
+        var isUnbound = !binding || binding.keyCode === 0;
+        var btnCls = 'sg-keybind-btn';
+        if (isCapturing) btnCls += ' sg-keybind-waiting';
+        else if (isUnbound) btnCls += ' sg-keybind-unbound';
+        var btnLabel = isCapturing ? 'Press a key...' : (isUnbound ? 'None' : escapeHtml(binding.label));
+
+        return '<div class="sg-keybind-row">' +
+            '<div class="sg-toggle-content">' +
+                '<span class="sg-label">' + escapeHtml(label) + '</span>' +
+                '<span class="sg-desc">' + escapeHtml(desc) + '</span>' +
+            '</div>' +
+            '<button class="' + btnCls + '" data-bind="' + escapeAttr(bindKey) + '" tabindex="-1">' + btnLabel + '</button>' +
+            '</div>';
+    }
+
     function bindSettingsEvents() {
         var root = document.getElementById(SETTINGS_ID);
         if (!root) return;
@@ -2077,6 +2167,58 @@
         if (closeBtn) {
             closeBtn.onclick = function () {
                 state.settingsVisible = false;
+                state.bindingCapture = null;
+                renderSettings();
+            };
+        }
+
+        // Tab buttons
+        var tabs = root.getElementsByClassName('sg-tab');
+        for (var t = 0; t < tabs.length; t++) {
+            (function (tab) {
+                tab.onclick = function () {
+                    var newTab = tab.getAttribute('data-tab');
+                    if (newTab && newTab !== state.settingsTab) {
+                        state.settingsTab = newTab;
+                        state.bindingCapture = null;
+                        renderSettings();
+                    }
+                };
+            })(tabs[t]);
+        }
+
+        // Keybinding buttons (left-click = capture, right-click = unassign)
+        var bindBtns = root.getElementsByClassName('sg-keybind-btn');
+        for (var b = 0; b < bindBtns.length; b++) {
+            (function (btn) {
+                btn.onclick = function () {
+                    var bindKey = btn.getAttribute('data-bind');
+                    if (!bindKey) return;
+                    state.bindingCapture = (state.bindingCapture === bindKey) ? null : bindKey;
+                    renderSettings();
+                };
+                btn.oncontextmenu = function (e) {
+                    e.preventDefault();
+                    var bindKey = btn.getAttribute('data-bind');
+                    if (!bindKey) return;
+                    state.keybindings[bindKey] = { keyCode: 0, label: 'None' };
+                    state.bindingCapture = null;
+                    saveSettings();
+                    renderSettings();
+                };
+            })(bindBtns[b]);
+        }
+
+        var resetCtrlBtn = document.getElementById('sg-reset-controls-btn');
+        if (resetCtrlBtn) {
+            resetCtrlBtn.onclick = function () {
+                for (var dk in DEFAULT_KEYBINDINGS) {
+                    if (DEFAULT_KEYBINDINGS.hasOwnProperty(dk)) {
+                        state.keybindings[dk] = { keyCode: DEFAULT_KEYBINDINGS[dk].keyCode, label: DEFAULT_KEYBINDINGS[dk].label };
+                    }
+                }
+                state.bindingCapture = null;
+                saveSettings();
                 renderSettings();
             };
         }
