@@ -1,5 +1,12 @@
 # LTD2 Smart Overlay
 
+[![Release](https://github.com/albrtbc/ltd2-smart-overlay/actions/workflows/release.yml/badge.svg)](https://github.com/albrtbc/ltd2-smart-overlay/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/albrtbc/ltd2-smart-overlay?label=version)](https://github.com/albrtbc/ltd2-smart-overlay/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/albrtbc/ltd2-smart-overlay/total)](https://github.com/albrtbc/ltd2-smart-overlay/releases)
+![.NET Standard 2.1](https://img.shields.io/badge/.NET_Standard-2.1-512BD4)
+![BepInEx 5](https://img.shields.io/badge/BepInEx-5.x-yellow)
+![Game](https://img.shields.io/badge/game-Legion_TD_2-orange)
+
 A BepInEx plugin for **Legion TD 2** that provides real-time in-game overlays with unit recommendations, mercenary analysis, scouting data, and wave matchup forecasting.
 
 ## Features
